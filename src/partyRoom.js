@@ -48,9 +48,16 @@ export class PartyRoom {
     this.closing = false;
     this.resultBlob = null;
     this.resultKey = "";
+    this.joinRetryTimer = null;
+    this.joinTimeout = null;
+    this.hostReconnectTimer = null;
     this.arena = document.getElementById("party-arena");
     this.arena?.addEventListener("click", (event) => this.handleClick(event));
     document.getElementById("btn-party-start")?.addEventListener("click", () => this.start());
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this.reconnectHost();
+    });
+    window.addEventListener("online", () => this.reconnectHost());
   }
 
   get active() { return Boolean(this.room); }
@@ -65,8 +72,17 @@ export class PartyRoom {
     this.host = true;
     this.closing = false;
     this.role = "P1";
-    this.peer = new Peer(`MD-${code}`);
-    this.peer.on("open", () => {
+    const peer = new Peer(`MD-${code}`);
+    this.peer = peer;
+    peer.on("open", () => {
+      if (this.peer !== peer || this.closing) return;
+      clearTimeout(this.hostReconnectTimer);
+      this.hostReconnectTimer = null;
+      if (this.room) {
+        this.publish();
+        this.toast("Room connection restored. Guests can join again.");
+        return;
+      }
       this.room = {
         code, size: count, starId, deckMode: count > 2 ? "extended-shuffled" : deckMode,
         phase: "lobby", players: [{ role: "P1", name: name.slice(0, 30), connected: true,
@@ -76,13 +92,38 @@ export class PartyRoom {
       this.enter();
       this.toast(`Room ${code} is ready. Invite ${count - 1} more ${count === 2 ? "player" : "players"}.`);
     });
-    this.peer.on("connection", (conn) => this.acceptConnection(conn));
-    this.peer.on("error", (error) => {
+    peer.on("connection", (conn) => this.acceptConnection(conn));
+    peer.on("disconnected", () => {
+      if (this.peer !== peer || this.closing) return;
+      this.toast("Room connection paused. Keep this tab open; reconnecting…");
+      this.scheduleHostReconnect();
+    });
+    peer.on("error", (error) => {
       if (error.type === "unavailable-id" && !this.room) {
         this.leave(false);
         this.toast("That room code is taken. Create another room.");
-      } else this.toast(`Room connection error: ${error.message || error.type}`);
+      } else if (this.peer === peer && !this.closing) {
+        this.toast(`Room connection error: ${error.message || error.type}`);
+        this.scheduleHostReconnect();
+      }
     });
+  }
+
+  scheduleHostReconnect() {
+    if (this.hostReconnectTimer || !this.host || this.closing) return;
+    this.hostReconnectTimer = setTimeout(() => {
+      this.hostReconnectTimer = null;
+      this.reconnectHost();
+      if (this.peer?.disconnected) this.scheduleHostReconnect();
+    }, 3000);
+  }
+
+  reconnectHost() {
+    if (!this.host || this.closing || document.hidden || !navigator.onLine) return;
+    const peer = this.peer;
+    if (peer?.disconnected && !peer.destroyed) {
+      try { peer.reconnect(); } catch { this.scheduleHostReconnect(); }
+    }
   }
 
   join({ code, name }) {
@@ -92,16 +133,44 @@ export class PartyRoom {
     this.closing = false;
     const peer = new Peer();
     this.peer = peer;
-    peer.on("open", () => {
+    const status = document.getElementById("join-connection-status");
+    if (status) status.textContent = "Connecting to the host…";
+    const joinButton = document.getElementById("btn-submit-join-room");
+    if (joinButton) { joinButton.disabled = true; joinButton.textContent = "Connecting…"; }
+    this.joinTimeout = setTimeout(() => {
+      if (this.peer !== peer || this.room) return;
+      this.leave(false);
+      this.toast("Host is offline. Ask them to reopen the room tab, then try again.");
+    }, 90000);
+    const retry = () => {
+      if (this.joinRetryTimer || this.peer !== peer || this.closing || this.room) return;
+      if (status) status.textContent = "Waiting for the host. Ask them to keep the room tab open; retrying…";
+      this.joinRetryTimer = setTimeout(() => {
+        this.joinRetryTimer = null;
+        connect();
+      }, 3000);
+    };
+    const connect = () => {
+      if (this.peer !== peer || this.closing || this.room || peer.destroyed) return;
+      clearTimeout(this.joinRetryTimer);
+      this.joinRetryTimer = null;
+      if (peer.disconnected) {
+        try { peer.reconnect(); } catch {}
+        retry();
+        return;
+      }
+      const previous = this.conn;
+      this.conn = null;
+      try { previous?.close(); } catch {}
       const conn = peer.connect(`MD-${code}`, { reliable: true });
       this.conn = conn;
-      const timer = setTimeout(() => {
-        if (!this.room) {
-          this.toast("Room not found. Check the code and ask the host to keep the room open.");
-          this.leave(false);
-        }
+      const watchdog = setTimeout(() => {
+        if (this.conn !== conn || this.room) return;
+        try { conn.close(); } catch {}
+        retry();
       }, 12000);
       conn.on("open", () => {
+        clearTimeout(watchdog);
         const roleHint = sessionStorage.getItem(`movie-draft-role-${code}`);
         conn.send({ type: "JOIN_REQUEST", name: name.slice(0, 30), roleHint });
       });
@@ -109,7 +178,13 @@ export class PartyRoom {
         const data = decodeMessage(message);
         if (!data || typeof data !== "object") return;
         if (data.type === "JOIN_ACCEPTED") {
-          clearTimeout(timer);
+          clearTimeout(watchdog);
+          clearTimeout(this.joinTimeout);
+          clearTimeout(this.joinRetryTimer);
+          this.joinTimeout = null;
+          this.joinRetryTimer = null;
+          if (status) status.textContent = "";
+          if (joinButton) { joinButton.disabled = false; joinButton.textContent = "Join Room"; }
           this.role = data.role;
           sessionStorage.setItem(`movie-draft-role-${code}`, this.role);
           sessionStorage.setItem(`movie-draft-name-${code}`, name);
@@ -121,21 +196,30 @@ export class PartyRoom {
           this.render();
         } else if (data.type === "REACTION") this.floatReaction(data.emoji);
         else if (data.type === "REJECTED") {
-          clearTimeout(timer);
+          clearTimeout(watchdog);
           this.toast(data.reason || "Could not join this room.");
           this.leave(false);
         }
       });
       conn.on("close", () => {
-        clearTimeout(timer);
+        clearTimeout(watchdog);
         if (!this.closing && this.room) {
           this.toast("Host disconnected. The room has closed.");
           this.leave();
-        }
+        } else if (this.conn === conn) retry();
       });
-      conn.on("error", () => this.toast("Could not connect to the host. Try the invite link again."));
+      conn.on("error", () => { clearTimeout(watchdog); retry(); });
+    };
+    peer.on("open", connect);
+    peer.on("error", (error) => {
+      if (this.peer !== peer || this.closing || this.room) return;
+      if (error.type === "peer-unavailable" || error.type === "network" || error.type === "webrtc") retry();
+      else {
+        this.leave(false);
+        this.toast(`Connection error: ${error.message || error.type}`);
+      }
     });
-    peer.on("error", (error) => this.toast(`Connection error: ${error.message || error.type}`));
+    peer.on("disconnected", retry);
   }
 
   acceptConnection(conn) {
@@ -198,6 +282,16 @@ export class PartyRoom {
   leave(notify = true) {
     const wasActive = this.active;
     this.closing = true;
+    clearTimeout(this.joinRetryTimer);
+    clearTimeout(this.joinTimeout);
+    clearTimeout(this.hostReconnectTimer);
+    this.joinRetryTimer = null;
+    this.joinTimeout = null;
+    this.hostReconnectTimer = null;
+    const joinButton = document.getElementById("btn-submit-join-room");
+    if (joinButton) { joinButton.disabled = false; joinButton.textContent = "Join Room"; }
+    const status = document.getElementById("join-connection-status");
+    if (status) status.textContent = "";
     try { this.conn?.close(); } catch {}
     try { this.peer?.destroy(); } catch {}
     this.conn = null;
@@ -406,7 +500,7 @@ export class PartyRoom {
         <strong class="party-code">${escapeHtml(room.code)}</strong>
         <button class="nf-btn-red" data-party="copy">Copy invite link</button>
         ${this.host && room.phase === "lobby" ? `<button class="nf-btn-red" data-party="start" ${joined === room.size ? "" : "disabled"}>Start Draft</button>` : ""}
-        <small>${this.host ? "You can start when everyone joins." : "The room creator will start the draft."}</small></section>`;
+        <small>${this.host ? "Keep this room tab open while guests join. You can start when everyone is here." : "The room creator will start the draft."}</small></section>`;
     } else if (room.phase === "draft") {
       const movie = movieFor(room, room.poolIds[room.index]);
       const me = this.player;
