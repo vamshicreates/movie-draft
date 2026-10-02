@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Movie Draft — Hero Auction</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,26 +30,26 @@
 
     <!-- Minimal Right Controls -->
     <div class="nf-actions">
-      <button id="btn-mp-toggle" class="nf-btn-ghost nf-btn-mp" title="Play live with a friend across 2 devices">
+      <button id="btn-mp-toggle" class="nf-btn-mp" title="Create or join a live room with a friend">
         <span class="mp-live-dot" id="mp-status-dot"></span>
-        <span id="mp-btn-label">🌐 Play Online</span>
+        <span id="mp-btn-label">Play online</span>
       </button>
 
-      <div class="nf-mode-switch" id="local-mode-switch">
-        <button id="mode-2p" class="nf-mode-btn active" data-mode="2p">2 Players</button>
-        <button id="mode-ai" class="nf-mode-btn" data-mode="ai">vs AI</button>
+      <div class="secondary-actions">
+        <div class="nf-mode-switch" id="local-mode-switch">
+          <button id="mode-2p" class="nf-mode-btn active" data-mode="2p">2 Players</button>
+          <button id="mode-ai" class="nf-mode-btn" data-mode="ai">vs AI</button>
+        </div>
+        <select id="select-deck-order" class="nf-select" aria-label="Movie Order">
+          <option value="video-exact">Original Order (10)</option>
+          <option value="video-shuffled">Shuffled (10)</option>
+          <option value="extended-shuffled">All Films (Shuffled)</option>
+        </select>
+        <button id="btn-sound-toggle" class="nf-icon-btn" title="Toggle Sound" aria-label="Toggle sound">
+          <span id="sound-icon">🔊</span>
+        </button>
+        <button id="btn-reset-draft" class="nf-btn-ghost">↻ Reset</button>
       </div>
-      <select id="select-deck-order" class="nf-select" aria-label="Movie Order">
-        <option value="video-exact">Original Order (10)</option>
-        <option value="video-shuffled">Shuffled (10)</option>
-        <option value="extended-shuffled">All Films (Shuffled)</option>
-      </select>
-      <button id="btn-sound-toggle" class="nf-icon-btn" title="Toggle Sound">
-        <span id="sound-icon">🔊</span>
-      </button>
-      <button id="btn-reset-draft" class="nf-btn-ghost">
-        ↻ Reset
-      </button>
     </div>
   </header>
 
@@ -61,7 +61,7 @@
         <div class="player-top">
           <div>
             <span class="player-label">PLAYER 1</span>
-            <input type="text" id="input-p1-name" class="player-name-input" value="Player 1" aria-label="Player 1 Name" />
+            <input type="text" id="input-p1-name" class="player-name-input" value="Player 1" aria-label="Player 1 Name" maxlength="30" />
           </div>
           <div class="budget-pill" id="p1-budget-box">
             <span class="budget-label">Budget</span>
@@ -140,30 +140,16 @@
           </div>
 
           <div class="movie-showcase">
-            <!-- Poster + Live Bid Overlay -->
+            <!-- Film poster and title -->
             <div class="poster-column">
-              <div class="live-bid-banner">
-                <span id="live-bid-who" class="bid-who">CURRENT BID</span>
-                <span id="live-bid-amount" class="bid-amt">₹1</span>
-              </div>
               <div class="poster-frame">
                 <img id="current-movie-poster" class="poster-img" src="/posters/nani/jersey.jpg" alt="Movie Poster" />
               </div>
+              <h3 class="movie-title" id="current-movie-title">Jersey</h3>
             </div>
 
-            <!-- Clean Film Details + Bidding Paddles -->
+            <!-- Bidding controls and reactions -->
             <div class="details-column">
-              <div class="meta-chips">
-                <span class="meta-chip" id="current-movie-year">2019</span>
-                <span class="meta-chip" id="current-movie-imdb">★ 8.5</span>
-                <span class="meta-chip meta-chip-verdict" id="current-movie-verdict">2x National Award Winner</span>
-              </div>
-
-              <h3 class="movie-title" id="current-movie-title">Jersey</h3>
-              <p class="movie-credits" id="current-movie-character">Role: <strong>Arjun</strong> · Dir: <strong>Gowtam Tinnanuri</strong></p>
-              <div class="genre-row" id="current-movie-genres"></div>
-              <p class="movie-synopsis" id="current-movie-tagline"></p>
-
               <!-- Bidding Console -->
               <div class="bidding-box">
                 <!-- Player 1 Controls -->
@@ -234,38 +220,46 @@
           </div>
         </div>
 
-        <!-- Final Results Panel (Shown when all 10 slots filled) -->
+        <!-- Final Results Panel -->
         <div id="draft-complete-panel" class="complete-panel hidden">
           <div class="complete-head">
             <span class="complete-badge">DRAFT COMPLETE</span>
             <h3 id="showdown-headline">Final 5-Movie Lineups</h3>
-            <p>Vote on who built the stronger 5-movie roster.</p>
+            <p>Share the matchup on Instagram. Ask friends to comment P1 or P2.</p>
           </div>
 
           <div class="poll-grid">
             <div class="poll-box">
               <div class="poll-box-head">
                 <h4 id="poll-p1-title">Player 1</h4>
-                <span class="score-pill" id="poll-p1-score">0 PTS</span>
+                <span class="result-player-tag">P1</span>
               </div>
-              <div class="poll-meta" id="poll-p1-metrics"></div>
-              <button id="btn-vote-p1" class="nf-btn-red">Vote Player 1 (<span id="votes-p1-count">50%</span>)</button>
+              <ol class="result-lineup" id="poll-p1-lineup"></ol>
+              <p class="result-budget" id="poll-p1-budget"></p>
             </div>
 
             <div class="poll-box">
               <div class="poll-box-head">
                 <h4 id="poll-p2-title">Player 2</h4>
-                <span class="score-pill" id="poll-p2-score">0 PTS</span>
+                <span class="result-player-tag">P2</span>
               </div>
-              <div class="poll-meta" id="poll-p2-metrics"></div>
-              <button id="btn-vote-p2" class="nf-btn-red">Vote Player 2 (<span id="votes-p2-count">50%</span>)</button>
+              <ol class="result-lineup" id="poll-p2-lineup"></ol>
+              <p class="result-budget" id="poll-p2-budget"></p>
             </div>
           </div>
 
+          <p class="share-help">The image asks friends to comment P1 or P2. Share it to Instagram Feed so everyone can vote in the comments. If Instagram is not in your share menu, download the image and copy the caption.</p>
           <div class="complete-actions">
+            <button id="btn-share-results" class="nf-btn-red" disabled>Share result</button>
+            <button id="btn-download-results" class="nf-btn-ghost" disabled>Download image</button>
+            <button id="btn-copy-caption" class="nf-btn-ghost">Copy caption</button>
             <button id="btn-play-again" class="nf-btn-red">Play Again</button>
-            <button id="btn-copy-summary" class="nf-btn-ghost">Copy Poll Summary</button>
           </div>
+          <p id="share-status" class="share-status" role="status" aria-live="polite">Preparing result image…</p>
+          <details id="share-preview" class="share-preview hidden">
+            <summary>Preview share image</summary>
+            <img id="share-image-preview" alt="Shareable Movie Draft matchup card" />
+          </details>
         </div>
       </section>
 
@@ -274,7 +268,7 @@
         <div class="player-top">
           <div>
             <span class="player-label">PLAYER 2</span>
-            <input type="text" id="input-p2-name" class="player-name-input" value="Player 2" aria-label="Player 2 Name" />
+            <input type="text" id="input-p2-name" class="player-name-input" value="Player 2" aria-label="Player 2 Name" maxlength="30" />
           </div>
           <div class="budget-pill" id="p2-budget-box">
             <span class="budget-label">Budget</span>
@@ -314,7 +308,7 @@
       <div id="mp-panel-create" class="modal-body-panel">
         <div class="modal-form-group">
           <label for="input-create-name">Your Name</label>
-          <input type="text" id="input-create-name" class="modal-input" placeholder="e.g. Vamshi" value="Player 1" />
+          <input type="text" id="input-create-name" class="modal-input" placeholder="e.g. Vamshi" value="Player 1" maxlength="30" />
         </div>
 
         <div class="modal-form-group">
@@ -350,7 +344,7 @@
 
         <div class="modal-form-group">
           <label for="input-join-name">Your Name</label>
-          <input type="text" id="input-join-name" class="modal-input" placeholder="e.g. Rahul" value="Player 2" />
+          <input type="text" id="input-join-name" class="modal-input" placeholder="e.g. Rahul" value="Player 2" maxlength="30" />
         </div>
 
         <button id="btn-submit-join-room" class="nf-btn-red modal-submit-btn">

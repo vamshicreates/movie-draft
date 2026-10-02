@@ -1,4 +1,5 @@
 import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
+import { createResultCard } from "./shareCard.js";
 
 // Keep only Heroes for this minimal version
 const HEROES_LIST = STARS_CATALOG.filter((s) => s.category === "Hero");
@@ -41,13 +42,11 @@ const state = {
     name: "Player 1",
     budget: GAME_CONFIG.defaultBudget,
     slots: [],
-    votes: 54,
   },
   p2: {
     name: "Player 2",
     budget: GAME_CONFIG.defaultBudget,
     slots: [],
-    votes: 46,
   },
 
   // Multiplayer State (Supports both WebSocket & WebRTC/PeerJS on Vercel)
@@ -468,10 +467,13 @@ function handleRemoteAction(action, payload) {
       startNewDraft(false);
     }
     showToast("🔄 Draft reset by host.");
-  } else if (action === "VOTE") {
-    if (payload.target === "P1") state.p1.votes += 1;
-    else state.p2.votes += 1;
-    renderShowdownPanel();
+  } else if (action === "UPDATE_NAME") {
+    if ((payload?.playerKey === "P1" || payload?.playerKey === "P2") && typeof payload.name === "string") {
+      const name = payload.name.trim().slice(0, 30) || (payload.playerKey === "P1" ? "Player 1" : "Player 2");
+      state[payload.playerKey.toLowerCase()].name = name;
+      state.roomPlayers[payload.playerKey.toLowerCase()].name = name;
+      renderAll();
+    }
   } else if (action === "FULL_SYNC" && state.myRole !== "P1") {
     syncFullGameState(payload.gameState);
   }
@@ -518,6 +520,16 @@ function broadcastFullGameState() {
 }
 
 function updateMultiplayerBadge() {
+  document.body.classList.toggle("online-room", state.isMultiplayer);
+  document.body.classList.toggle("role-p1", state.isMultiplayer && state.myRole === "P1");
+  document.body.classList.toggle("role-p2", state.isMultiplayer && state.myRole === "P2");
+  const guest = state.isMultiplayer && state.myRole !== "P1";
+  for (const id of ["select-deck-order", "btn-reset-draft", "btn-play-again", "btn-skip-movie"]) {
+    const control = document.getElementById(id);
+    if (control) control.disabled = guest;
+  }
+  const playAgain = document.getElementById("btn-play-again");
+  if (playAgain) playAgain.textContent = guest ? "Host starts next draft" : "Play Again";
   const dot = document.getElementById("mp-status-dot");
   const label = document.getElementById("mp-btn-label");
   const roomStrip = document.getElementById("room-status-strip");
@@ -529,7 +541,7 @@ function updateMultiplayerBadge() {
 
   if (!state.isMultiplayer) {
     dot?.classList.remove("connected", "waiting");
-    if (label) label.textContent = "🌐 Play Online";
+    if (label) label.textContent = "Play online";
     roomStrip?.classList.add("hidden");
     waitingBanner?.classList.add("hidden");
     return;
@@ -619,11 +631,9 @@ function startNewDraft(broadcast = true) {
 
   state.p1.budget = GAME_CONFIG.defaultBudget;
   state.p1.slots = [];
-  state.p1.votes = 54;
 
   state.p2.budget = GAME_CONFIG.defaultBudget;
   state.p2.slots = [];
-  state.p2.votes = 46;
 
   renderAll();
 
@@ -867,22 +877,6 @@ function renderHeroSelector() {
   });
 }
 
-function calculatePlayerMetrics(player) {
-  if (player.slots.length === 0) {
-    return { avgImdb: "—", score: 0 };
-  }
-  const sumImdb = player.slots.reduce((acc, s) => acc + (s.movie.imdb || 7.5), 0);
-  const avgImdb = (sumImdb / player.slots.length).toFixed(1);
-  const basePoints = player.slots.reduce(
-    (acc, s) => acc + Math.round((s.movie.imdb || 7.5) * 2 + (s.movie.baseValue || 5)),
-    0
-  );
-  return {
-    avgImdb: `★ ${avgImdb}`,
-    score: basePoints + player.budget,
-  };
-}
-
 function renderPlayerBoards() {
   const renderSide = (player, prefix, playerKey) => {
     const budgetVal = document.getElementById(`${prefix}-budget-val`);
@@ -957,6 +951,7 @@ function renderPlayerBoards() {
 }
 
 function renderCenterStage() {
+  updateMultiplayerBadge();
   const star = getActiveStar();
   const titleEl = document.getElementById("arena-star-title");
   if (titleEl) titleEl.textContent = `${star.name}'s Movies Draft`;
@@ -998,26 +993,8 @@ function renderCenterStage() {
     posterImg.src = movie.poster;
   }
 
-  const liveWho = document.getElementById("live-bid-who");
-  const liveAmt = document.getElementById("live-bid-amount");
-  if (liveWho && liveAmt) {
-    liveWho.textContent = state.highBidder ? `${state.highBidder} LEADS` : "OPENING BID";
-    liveAmt.textContent = state.highBidder ? `₹${state.currentBid}` : "₹1";
-  }
-
-  document.getElementById("current-movie-year").textContent = movie.year;
-  document.getElementById("current-movie-verdict").textContent = movie.verdict || "Blockbuster";
-  document.getElementById("current-movie-imdb").textContent = `★ ${movie.imdb || "7.8"}`;
   document.getElementById("current-movie-title").textContent = movie.title;
-  document.getElementById("current-movie-character").innerHTML =
-    `Role: <strong>${movie.character || "Lead"}</strong> · Dir: <strong>${movie.director || "—"}</strong> · Music: <strong>${movie.music || "—"}</strong>`;
-
-  const genresRow = document.getElementById("current-movie-genres");
-  if (genresRow) {
-    genresRow.innerHTML = (movie.genre || []).map((g) => `<span class="genre-tag">${g}</span>`).join("");
-  }
-
-  document.getElementById("current-movie-tagline").textContent = movie.tagline || "";
+  if (posterImg) posterImg.alt = `${movie.title} poster`;
 
   const nextBidAmt = state.highBidder === null ? 1 : state.currentBid + 1;
   const p1CanBid = state.p1.slots.length < 5 && state.p1.budget >= nextBidAmt && state.highBidder !== "P1";
@@ -1140,35 +1117,132 @@ function renderCenterStage() {
     }
   }
 
-  updateMultiplayerBadge();
+}
+
+let resultCardBlob = null;
+let resultCardKey = "";
+let resultCardPreviewUrl = null;
+
+function setShareStatus(message) {
+  const status = document.getElementById("share-status");
+  if (status) status.textContent = message;
+}
+
+function renderResultLineup(player, prefix) {
+  document.getElementById(`poll-${prefix}-title`).textContent = player.name;
+  document.getElementById(`poll-${prefix}-budget`).textContent = `₹${player.budget} left from ₹20`;
+
+  const list = document.getElementById(`poll-${prefix}-lineup`);
+  list.replaceChildren();
+  for (let index = 0; index < 5; index += 1) {
+    const slot = player.slots[index];
+    const item = document.createElement("li");
+    item.className = "result-film";
+
+    if (slot) {
+      const poster = document.createElement("img");
+      poster.src = slot.movie.poster || "";
+      poster.alt = "";
+      poster.loading = "lazy";
+      item.appendChild(poster);
+    } else {
+      const emptyPoster = document.createElement("span");
+      emptyPoster.className = "result-film-empty";
+      item.appendChild(emptyPoster);
+    }
+
+    const details = document.createElement("span");
+    details.className = "result-film-details";
+    const title = document.createElement("strong");
+    title.textContent = slot?.movie?.shortTitle || slot?.movie?.title || "Open slot";
+    details.appendChild(title);
+    if (slot) {
+      const price = document.createElement("small");
+      price.textContent = `Won for ₹${slot.price}`;
+      details.appendChild(price);
+    }
+    item.appendChild(details);
+    list.appendChild(item);
+  }
+}
+
+function prepareResultCard() {
+  const star = getActiveStar();
+  const players = [state.p1, state.p2].map((player) => ({
+    name: player.name,
+    budget: player.budget,
+    slots: player.slots.map((slot) => ({ movie: slot.movie, price: slot.price })),
+  }));
+  const key = JSON.stringify([star.id, players]);
+  if (key === resultCardKey) return;
+  resultCardKey = key;
+  resultCardBlob = null;
+  if (resultCardPreviewUrl) URL.revokeObjectURL(resultCardPreviewUrl);
+  resultCardPreviewUrl = null;
+  document.getElementById("share-preview").classList.add("hidden");
+  document.getElementById("btn-share-results").disabled = true;
+  document.getElementById("btn-download-results").disabled = true;
+  setShareStatus("Preparing result image…");
+
+  createResultCard(star.name, players[0], players[1]).then((blob) => {
+    if (resultCardKey !== key) return;
+    resultCardBlob = blob;
+    resultCardPreviewUrl = URL.createObjectURL(blob);
+    document.getElementById("share-image-preview").src = resultCardPreviewUrl;
+    document.getElementById("share-preview").classList.remove("hidden");
+    document.getElementById("btn-share-results").disabled = false;
+    document.getElementById("btn-download-results").disabled = false;
+    setShareStatus("Result image ready to share.");
+  }).catch((error) => {
+    if (resultCardKey !== key) return;
+    console.error("Result image error:", error);
+    setShareStatus("Could not make the image. Try resetting and finishing the draft again.");
+  });
 }
 
 function renderShowdownPanel() {
   const star = getActiveStar();
   document.getElementById("showdown-headline").textContent = `${star.name}'s Movies Draft — Final Lineups`;
+  renderResultLineup(state.p1, "p1");
+  renderResultLineup(state.p2, "p2");
+  prepareResultCard();
+}
 
-  const m1 = calculatePlayerMetrics(state.p1);
-  const m2 = calculatePlayerMetrics(state.p2);
+function getShareCaption() {
+  const star = getActiveStar();
+  const lineup = (player, label) => `${label} ${player.name}: ${player.slots.map((slot) => slot.movie.shortTitle || slot.movie.title).join(", ") || "No films"}`;
+  return `🎬 ${star.name}'s Movie Draft\n${lineup(state.p1, "P1")}\n${lineup(state.p2, "P2")}\n\nWho drafted better? Comment P1 or P2 👇\n${window.location.origin}`;
+}
 
-  document.getElementById("poll-p1-title").textContent = state.p1.name;
-  document.getElementById("poll-p1-score").textContent = `${m1.score} PTS`;
-  document.getElementById("poll-p1-metrics").innerHTML = `
-    <div><strong>Films:</strong> ${state.p1.slots.map((s) => s.movie.shortTitle || s.movie.title).join(", ")}</div>
-    <div><strong>Avg IMDb:</strong> ${m1.avgImdb} · <strong>Budget Left:</strong> ₹${state.p1.budget}</div>
-  `;
+function downloadResultCard() {
+  if (!resultCardBlob) return;
+  const url = URL.createObjectURL(resultCardBlob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "movie-draft-result.png";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  setShareStatus("Result image downloaded. Post it to Instagram and ask friends to comment P1 or P2.");
+}
 
-  document.getElementById("poll-p2-title").textContent = state.p2.name;
-  document.getElementById("poll-p2-score").textContent = `${m2.score} PTS`;
-  document.getElementById("poll-p2-metrics").innerHTML = `
-    <div><strong>Films:</strong> ${state.p2.slots.map((s) => s.movie.shortTitle || s.movie.title).join(", ")}</div>
-    <div><strong>Avg IMDb:</strong> ${m2.avgImdb} · <strong>Budget Left:</strong> ₹${state.p2.budget}</div>
-  `;
-
-  const totalVotes = state.p1.votes + state.p2.votes;
-  const p1Pct = Math.round((state.p1.votes / totalVotes) * 100);
-  const p2Pct = 100 - p1Pct;
-  document.getElementById("votes-p1-count").textContent = `${p1Pct}%`;
-  document.getElementById("votes-p2-count").textContent = `${p2Pct}%`;
+async function shareResultCard() {
+  if (!resultCardBlob) return;
+  const file = new File([resultCardBlob], "movie-draft-result.png", { type: "image/png" });
+  if (!navigator.share || !navigator.canShare?.({ files: [file] })) {
+    downloadResultCard();
+    return;
+  }
+  try {
+    await navigator.share({ files: [file], title: "Movie Draft result", text: getShareCaption() });
+    setShareStatus("Result shared. Ask friends to comment P1 or P2.");
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      console.error("Share error:", error);
+      downloadResultCard();
+    }
+  }
 }
 
 function renderAll() {
@@ -1278,6 +1352,7 @@ function initEvents() {
   });
 
   document.getElementById("select-deck-order")?.addEventListener("change", (e) => {
+    if (state.isMultiplayer && state.myRole !== "P1") return;
     state.deckMode = e.target.value;
     startNewDraft(true);
   });
@@ -1306,15 +1381,25 @@ function initEvents() {
     startNewDraft(false);
   });
 
-  document.getElementById("btn-reset-draft")?.addEventListener("click", () => startNewDraft(true));
-  document.getElementById("btn-play-again")?.addEventListener("click", () => startNewDraft(true));
+  document.getElementById("btn-reset-draft")?.addEventListener("click", () => {
+    if (!state.isMultiplayer || state.myRole === "P1") startNewDraft(true);
+  });
+  document.getElementById("btn-play-again")?.addEventListener("click", () => {
+    if (!state.isMultiplayer || state.myRole === "P1") startNewDraft(true);
+  });
 
   document.getElementById("input-p1-name")?.addEventListener("input", (e) => {
     state.p1.name = e.target.value || "Player 1";
+    if (state.isMultiplayer && state.myRole === "P1") {
+      sendMultiplayerMessage({ type: "SYNC_ACTION", roomCode: state.roomCode, action: "UPDATE_NAME", payload: { playerKey: "P1", name: state.p1.name } });
+    }
     renderCenterStage();
   });
   document.getElementById("input-p2-name")?.addEventListener("input", (e) => {
     state.p2.name = e.target.value || "Player 2";
+    if (state.isMultiplayer && state.myRole === "P2") {
+      sendMultiplayerMessage({ type: "SYNC_ACTION", roomCode: state.roomCode, action: "UPDATE_NAME", payload: { playerKey: "P2", name: state.p2.name } });
+    }
     renderCenterStage();
   });
 
@@ -1327,7 +1412,7 @@ function initEvents() {
   document.getElementById("btn-p2-teesko")?.addEventListener("click", () => handleTeesko("P2"));
 
   document.getElementById("btn-skip-movie")?.addEventListener("click", () => {
-    advanceToNextMovie(true);
+    if (!state.isMultiplayer || state.myRole === "P1") advanceToNextMovie(true);
   });
 
   // Reaction Bar
@@ -1432,40 +1517,15 @@ function initEvents() {
     else if (key === "l" && state.highBidder === "P1") handleTeesko("P2");
   });
 
-  // Final Showdown Voting
-  document.getElementById("btn-vote-p1")?.addEventListener("click", () => {
-    state.p1.votes += 1;
-    renderShowdownPanel();
-    if (state.isMultiplayer && state.roomCode) {
-      sendMultiplayerMessage({
-        type: "SYNC_ACTION",
-        roomCode: state.roomCode,
-        action: "VOTE",
-        payload: { target: "P1" },
-      });
+  document.getElementById("btn-share-results")?.addEventListener("click", shareResultCard);
+  document.getElementById("btn-download-results")?.addEventListener("click", downloadResultCard);
+  document.getElementById("btn-copy-caption")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(getShareCaption());
+      showToast("Caption copied. Paste it into your Instagram post.");
+    } catch {
+      showToast("Could not copy the caption in this browser.");
     }
-  });
-
-  document.getElementById("btn-vote-p2")?.addEventListener("click", () => {
-    state.p2.votes += 1;
-    renderShowdownPanel();
-    if (state.isMultiplayer && state.roomCode) {
-      sendMultiplayerMessage({
-        type: "SYNC_ACTION",
-        roomCode: state.roomCode,
-        action: "VOTE",
-        payload: { target: "P2" },
-      });
-    }
-  });
-
-  document.getElementById("btn-copy-summary")?.addEventListener("click", () => {
-    const star = getActiveStar();
-    const p1List = state.p1.slots.map((s, i) => `${i + 1}. ${s.movie.title} (₹${s.price})`).join("\n");
-    const p2List = state.p2.slots.map((s, i) => `${i + 1}. ${s.movie.title} (₹${s.price})`).join("\n");
-    const text = `🎬 ${star.name}'s Movies Draft (₹20 Budget)\n\n${state.p1.name} (₹${state.p1.budget} left):\n${p1List}\n\n${state.p2.name} (₹${state.p2.budget} left):\n${p2List}\n\nWho won this draft?`;
-    navigator.clipboard?.writeText(text);
-    showToast("Copied draft summary to clipboard!");
   });
 }
 
