@@ -34,6 +34,12 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+body {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ========================================================================= */
 /* MINIMAL NETFLIX HEADER                                                    */
 /* ========================================================================= */
@@ -218,8 +224,36 @@ html, body {
 /* ========================================================================= */
 .nf-arena {
   max-width: 1480px;
+  width: 100%;
+  flex: 1;
   margin: 0 auto;
   padding: 1.25rem 1.75rem 2rem;
+}
+
+.site-credit {
+  padding: 1.1rem 1.75rem 1.4rem;
+  border-top: 1px solid var(--nf-border);
+  color: var(--nf-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.site-credit a {
+  color: var(--nf-white);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-credit a:hover,
+.site-credit a:focus-visible {
+  color: var(--nf-red);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.site-credit span {
+  color: var(--nf-muted);
+  font-weight: 500;
 }
 
 .nf-grid {
