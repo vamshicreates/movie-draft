@@ -1,27 +1,6 @@
 {
-  "version": 2,
-  "name": "movie-draft",
-  "cleanUrls": true,
-  "routes": [
-    {
-      "src": "/posters/(.*)",
-      "dest": "/public/posters/$1"
-    },
-    {
-      "src": "/sfx/(.*)",
-      "dest": "/public/sfx/$1"
-    },
-    {
-      "src": "/video/(.*)",
-      "dest": "/public/video/$1"
-    },
-    {
-      "src": "/src/(.*)",
-      "dest": "/src/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
 }

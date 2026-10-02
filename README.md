@@ -42,7 +42,13 @@ Open [http://localhost:3040](http://localhost:3040) in your browser.
 
 ## 🚢 Deploy to Vercel
 
-Deploy directly with zero configuration:
+Deploy the repository to Vercel with the **Other** framework preset. The committed
+`vercel.json` runs `npm run build` and serves `dist/`, which contains `index.html`,
+the JavaScript and CSS, and the posters, sound, and video assets. This explicit
+output folder is necessary because Vercel otherwise serves only `public/` when
+that directory exists, leaving the homepage at `/` unavailable.
+
+You can deploy through the Vercel dashboard:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
@@ -50,6 +56,9 @@ Or run:
 ```bash
 npx vercel
 ```
+
+Vercel hosts the static site; online rooms there use the browser's PeerJS/WebRTC
+transport. `npm run dev` uses the Node WebSocket server for local development.
 
 ---
 
