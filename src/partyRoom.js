@@ -51,11 +51,15 @@ export class PartyRoom {
     this.joinRetryTimer = null;
     this.joinTimeout = null;
     this.hostReconnectTimer = null;
+    this.startTimer = null;
     this.arena = document.getElementById("party-arena");
     this.arena?.addEventListener("click", (event) => this.handleClick(event));
     document.getElementById("btn-party-start")?.addEventListener("click", () => this.start());
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) this.reconnectHost();
+      if (!document.hidden) {
+        this.reconnectHost();
+        this.scheduleAutoStart();
+      }
     });
     window.addEventListener("online", () => this.reconnectHost());
   }
@@ -250,6 +254,7 @@ export class PartyRoom {
         if (this.room.phase === "paused") this.room.phase = "draft";
         conn.send({ type: "JOIN_ACCEPTED", role: player.role, room: this.room });
         this.publish();
+        this.scheduleAutoStart();
         this.toast(`${name} joined as ${player.role}.`);
       } else {
         const record = this.connections.get(conn.peer);
@@ -285,9 +290,11 @@ export class PartyRoom {
     clearTimeout(this.joinRetryTimer);
     clearTimeout(this.joinTimeout);
     clearTimeout(this.hostReconnectTimer);
+    clearTimeout(this.startTimer);
     this.joinRetryTimer = null;
     this.joinTimeout = null;
     this.hostReconnectTimer = null;
+    this.startTimer = null;
     const joinButton = document.getElementById("btn-submit-join-room");
     if (joinButton) { joinButton.disabled = false; joinButton.textContent = "Join Room"; }
     const status = document.getElementById("join-connection-status");
@@ -320,11 +327,23 @@ export class PartyRoom {
     }
   }
 
+  scheduleAutoStart() {
+    if (!this.host || this.startTimer || this.room?.phase !== "lobby") return;
+    if (this.room.players.length !== this.room.size || this.room.players.some((player) => !player.connected)) return;
+    this.startTimer = setTimeout(() => {
+      this.startTimer = null;
+      if (this.room?.phase === "lobby") this.start();
+    }, 2500);
+  }
+
   start() {
     if (!this.host || !this.room) return;
+    if (this.room.phase !== "lobby" && this.room.phase !== "complete") return;
     if (this.room.players.length !== this.room.size || this.room.players.some((player) => !player.connected)) {
       return this.toast(`Wait for all ${this.room.size} players to join.`);
     }
+    clearTimeout(this.startTimer);
+    this.startTimer = null;
     const star = HEROES.find((entry) => entry.id === this.room.starId);
     const all = star.movies;
     if (all.length < this.room.size * slotsPerPlayer) return this.toast("This hero needs more films for this room size.");
@@ -467,7 +486,7 @@ export class PartyRoom {
     const start = document.getElementById("btn-party-start");
     start.classList.toggle("hidden", !this.host);
     start.disabled = this.room.phase !== "lobby" || this.room.players.length !== this.room.size || this.room.players.some((p) => !p.connected);
-    start.textContent = this.room.phase === "complete" ? "Play Again" : this.room.phase === "lobby" ? `Start ${this.room.size}-Player Draft` : "Draft in progress";
+    start.textContent = this.room.phase === "complete" ? "Play Again" : this.room.phase === "lobby" ? "Start Movie Draft" : "Draft in progress";
     if (this.room.phase === "complete") start.disabled = false;
   }
 
@@ -494,13 +513,20 @@ export class PartyRoom {
 
     let center = "";
     if (room.phase === "lobby" || room.phase === "paused") {
+      const waiting = room.size - joined;
+      const roster = Array.from({ length: room.size }, (_, index) => {
+        const player = room.players[index];
+        return `<li class="${player?.connected ? "joined" : "waiting"}"><span>P${index + 1}${index === 0 ? " · Host" : ""}</span><strong>${escapeHtml(player?.name || "Waiting to join")}</strong><span>${player?.connected ? "● Joined" : "○ Waiting"}</span></li>`;
+      }).join("");
       center = `<section class="party-wait"><span class="party-big-icon">${room.phase === "paused" ? "⏸" : "🎬"}</span>
         <h2>${room.phase === "paused" ? "Waiting for a player to reconnect" : `Your ${room.size}-player room is ready`}</h2>
         <p>${joined}/${room.size} players connected · ${escapeHtml(star.name)} movies · 5 picks each</p>
+        <ol class="party-lobby-players">${roster}</ol>
+        <p class="party-lobby-status">${room.phase === "paused" ? "The draft resumes when everyone reconnects." : waiting ? `Waiting for ${waiting} more ${waiting === 1 ? "player" : "players"}…` : "Everyone is here. Starting the movie draft…"}</p>
         <strong class="party-code">${escapeHtml(room.code)}</strong>
-        <button class="nf-btn-red" data-party="copy">Copy invite link</button>
-        ${this.host && room.phase === "lobby" ? `<button class="nf-btn-red" data-party="start" ${joined === room.size ? "" : "disabled"}>Start Draft</button>` : ""}
-        <small>${this.host ? "Keep this room tab open while guests join. You can start when everyone is here." : "The room creator will start the draft."}</small></section>`;
+        ${this.host && room.phase === "lobby" ? `<button class="nf-btn-red" data-party="start" ${joined === room.size ? "" : "disabled"}>Start Movie Draft</button>` : ""}
+        <button class="nf-btn-ghost" data-party="copy">Copy invite link</button>
+        <small>${this.host ? "Keep this room tab open while guests join." : "The draft starts automatically when everyone joins."}</small></section>`;
     } else if (room.phase === "draft") {
       const movie = movieFor(room, room.poolIds[room.index]);
       const me = this.player;

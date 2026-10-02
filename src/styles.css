@@ -1634,6 +1634,13 @@ kbd {
 .party-wait button { min-height: 44px; min-width: 190px; }
 .party-wait button:disabled { opacity: .5; }
 .party-wait small { color: var(--nf-muted); }
+.party-lobby-players { width: min(100%, 420px); display: grid; gap: .4rem; padding: 0; margin: .3rem 0; list-style: none; }
+.party-lobby-players li { display: flex; align-items: center; gap: .5rem; min-width: 0; padding: .55rem .7rem; border: 1px solid var(--nf-border); border-radius: 9px; background: #242424; text-align: left; font-size: .78rem; }
+.party-lobby-players li > span:first-child { color: var(--nf-red); font-weight: 800; white-space: nowrap; }
+.party-lobby-players strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.party-lobby-players li > span:last-child { margin-left: auto; color: #6ed891; white-space: nowrap; }
+.party-lobby-players li.waiting > span:last-child { color: var(--nf-muted); }
+.party-lobby-status { color: var(--nf-silver); font-weight: 700; }
 .party-results { padding: 1.5rem; }
 .party-results > h2 { font-size: clamp(1.7rem, 3vw, 2.3rem); margin: .65rem 0 .2rem; }
 .party-results > p { color: var(--nf-silver); font-size: .9rem; }

@@ -8,7 +8,7 @@ A live **Movie Draft & Auction Game** inspired by Telugu cinema. Draft five-film
 
 ## ✨ Features
 
-- 🎮 **Online rooms for 2–5 players**: The creator chooses the room size, shares a code or invite link, and starts once everyone joins. The host validates bids and sends a shared room state to every device.
+- 🎮 **Online rooms for 2–5 players**: The creator chooses the room size and shares a code or invite link. The lobby shows who has joined, and the draft starts automatically when everyone is connected; the host can also tap Start Movie Draft. The host validates bids and sends a shared room state to every device.
 - ⚡ **WebRTC rooms**: PeerJS DataChannels connect players on Vercel and during local development. The host needs to keep their browser tab open for the room to stay available.
 - 📱 **Mobile & touch layout**: Online rooms put the film poster and your bidding paddle in focus, with a scrollable lineup strip on small screens.
 - 🍿 **Authentic Auction Mechanics**:
