@@ -153,3 +153,83 @@ export async function createResultCard(starName, p1, p2) {
     canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Could not create result image")), "image/png");
   });
 }
+
+// A portrait image that stays legible when a room has three to five lineups.
+export async function createPartyResultCard(starName, players) {
+  if (document.fonts?.ready) await document.fonts.ready;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas is unavailable");
+  const posters = await Promise.all(players.map((player) =>
+    Promise.all(player.slots.map((slot) => loadPoster(slot.movie.poster)))
+  ));
+  ctx.fillStyle = "#090909";
+  ctx.fillRect(0, 0, 1080, 1920);
+  ctx.fillStyle = RED;
+  ctx.fillRect(0, 0, 1080, 16);
+  ctx.fillStyle = WHITE;
+  ctx.font = `800 56px ${FONT}`;
+  ctx.fillText("MOVIE DRAFT", 54, 102);
+  ctx.font = `800 49px ${FONT}`;
+  ctx.fillText("Who drafted better?", 54, 173);
+  ctx.fillStyle = MUTED;
+  ctx.font = `600 26px ${FONT}`;
+  fitText(ctx, `${starName} · ₹20 each · 5 films each`, 56, 216, 970);
+
+  const cols = 2;
+  const cardW = 476;
+  const cardH = players.length <= 2 ? 1260 : 490;
+  const gapX = 20;
+  const gapY = 24;
+  for (let i = 0; i < players.length; i += 1) {
+    const player = players[i];
+    const x = 54 + (i % cols) * (cardW + gapX);
+    const y = 258 + Math.floor(i / cols) * (cardH + gapY);
+    ctx.fillStyle = "#1d1d1d";
+    roundedRect(ctx, x, y, cardW, cardH, 20);
+    ctx.fill();
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = RED;
+    roundedRect(ctx, x + 18, y + 17, 66, 38, 8);
+    ctx.fill();
+    ctx.fillStyle = WHITE;
+    ctx.font = `800 22px ${FONT}`;
+    ctx.fillText(`P${i + 1}`, x + 33, y + 44);
+    ctx.font = `800 26px ${FONT}`;
+    fitText(ctx, player.name, x + 100, y + 44, cardW - 120);
+    ctx.fillStyle = MUTED;
+    ctx.font = `600 17px ${FONT}`;
+    ctx.fillText(`₹${player.budget} remaining`, x + 20, y + 82);
+    const rowH = players.length <= 2 ? 185 : 78;
+    for (let j = 0; j < 5; j += 1) {
+      const slot = player.slots[j];
+      const rowY = y + 104 + j * rowH;
+      const imgW = players.length <= 2 ? 91 : 48;
+      const imgH = players.length <= 2 ? 135 : 66;
+      drawPoster(ctx, posters[i]?.[j], x + 18, rowY, imgW, imgH);
+      ctx.fillStyle = WHITE;
+      ctx.font = `800 ${players.length <= 2 ? 25 : 20}px ${FONT}`;
+      fitText(ctx, slot?.movie?.shortTitle || slot?.movie?.title || "Open slot", x + imgW + 30, rowY + (players.length <= 2 ? 55 : 29), cardW - imgW - 51);
+      ctx.fillStyle = MUTED;
+      ctx.font = `600 ${players.length <= 2 ? 19 : 16}px ${FONT}`;
+      if (slot) ctx.fillText(`₹${slot.price}`, x + imgW + 30, rowY + (players.length <= 2 ? 86 : 53));
+    }
+  }
+  ctx.fillStyle = RED;
+  roundedRect(ctx, 54, 1800, 972, 80, 14);
+  ctx.fill();
+  ctx.fillStyle = WHITE;
+  ctx.textAlign = "center";
+  ctx.font = `800 31px ${FONT}`;
+  ctx.fillText(`COMMENT ${players.map((_, i) => `P${i + 1}`).join(" / ")}`, 540, 1852);
+  ctx.textAlign = "left";
+  ctx.fillStyle = MUTED;
+  ctx.font = `600 18px ${FONT}`;
+  ctx.fillText("movie-draft-phi.vercel.app", 54, 1907);
+  return new Promise((resolve, reject) => canvas.toBlob((blob) =>
+    blob ? resolve(blob) : reject(new Error("Could not create result image")), "image/png"));
+}

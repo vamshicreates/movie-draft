@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test-party-room.mjs"
   },
   "dependencies": {
     "ws": "^8.22.0"

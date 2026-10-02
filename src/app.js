@@ -1,5 +1,6 @@
 import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
 import { createResultCard } from "./shareCard.js";
+import { PartyRoom } from "./partyRoom.js";
 
 // Keep only Heroes for this minimal version
 const HEROES_LIST = STARS_CATALOG.filter((s) => s.category === "Hero");
@@ -61,6 +62,8 @@ const state = {
     spectatorCount: 0,
   },
 };
+
+let party = null;
 
 // ============================================================================
 // SOUND ENGINE
@@ -866,6 +869,7 @@ function renderHeroSelector() {
       <span>${star.name}</span>
     `;
     btn.addEventListener("click", () => {
+      if (party?.active) return showToast("Leave the online room to change heroes.");
       if (state.isMultiplayer && state.myRole !== "P1") {
         showToast("Only room host (Player 1) can change the draft hero.");
         return;
@@ -1259,7 +1263,10 @@ function openMpModal(defaultTab = "create") {
   if (!backdrop) return;
   backdrop.classList.remove("hidden");
 
-  if (state.isMultiplayer) {
+  if (party?.active) {
+    showModalPanel("active");
+    party.renderModal();
+  } else if (state.isMultiplayer) {
     showModalPanel("active");
     const activeCode = document.getElementById("modal-active-room-code");
     if (activeCode) activeCode.textContent = state.roomCode;
@@ -1313,6 +1320,7 @@ function showModalPanel(tabKey) {
 }
 
 function copyRoomLink() {
+  if (party?.active) return party.copyLink();
   const url = `${window.location.origin}${window.location.pathname}?room=${state.roomCode}`;
   navigator.clipboard?.writeText(url).then(() => {
     showToast(`🔗 Invite link copied: ${url}`);
@@ -1322,6 +1330,7 @@ function copyRoomLink() {
 }
 
 function leaveRoom() {
+  if (party?.active) return party.leave();
   if (state.isMultiplayer) {
     sendMultiplayerMessage({ type: "LEAVE_ROOM" });
   }
@@ -1352,6 +1361,7 @@ function initEvents() {
   });
 
   document.getElementById("select-deck-order")?.addEventListener("change", (e) => {
+    if (party?.active) return;
     if (state.isMultiplayer && state.myRole !== "P1") return;
     state.deckMode = e.target.value;
     startNewDraft(true);
@@ -1382,9 +1392,11 @@ function initEvents() {
   });
 
   document.getElementById("btn-reset-draft")?.addEventListener("click", () => {
+    if (party?.active) return party.start();
     if (!state.isMultiplayer || state.myRole === "P1") startNewDraft(true);
   });
   document.getElementById("btn-play-again")?.addEventListener("click", () => {
+    if (party?.active) return party.start();
     if (!state.isMultiplayer || state.myRole === "P1") startNewDraft(true);
   });
 
@@ -1455,27 +1467,8 @@ function initEvents() {
     const deckMode = document.getElementById("select-create-deck")?.value || "video-exact";
     const roomCode = generateRoomCode();
 
-    state.myName = name;
-    state.activeStarId = starId;
-    state.deckMode = deckMode;
-
-    if (isVercelOrStatic()) {
-      initPeerJsHost(roomCode, name, starId, deckMode);
-    } else {
-      connectWebSocket(() => {
-        if (state.transportType === "ws" && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
-          sendMultiplayerMessage({
-            type: "CREATE_ROOM",
-            roomCode,
-            name,
-            activeStarId: starId,
-            deckMode,
-          });
-        } else {
-          initPeerJsHost(roomCode, name, starId, deckMode);
-        }
-      });
-    }
+    party.create({ code: roomCode, name, starId,
+      size: document.getElementById("select-create-players")?.value || "3", deckMode });
   });
 
   // Submit Join Room
@@ -1483,32 +1476,17 @@ function initEvents() {
     const code = document.getElementById("input-join-code")?.value?.trim().toUpperCase();
     const name = document.getElementById("input-join-name")?.value?.trim() || "Player 2";
 
-    if (!code) {
-      showToast("Please enter a room code.");
+    if (!code || !/^[A-Z0-9]{4,12}$/.test(code)) {
+      showToast("Enter a valid room code from the invite link.");
       return;
     }
 
-    state.myName = name;
-
-    if (isVercelOrStatic()) {
-      initPeerJsJoin(code, name);
-    } else {
-      connectWebSocket(() => {
-        if (state.transportType === "ws" && wsSocket && wsSocket.readyState === WebSocket.OPEN) {
-          sendMultiplayerMessage({
-            type: "JOIN_ROOM",
-            roomCode: code,
-            name,
-          });
-        } else {
-          initPeerJsJoin(code, name);
-        }
-      });
-    }
+    party.join({ code, name });
   });
 
   // Keyboard Shortcuts
   window.addEventListener("keydown", (e) => {
+    if (party?.active) return;
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
     const key = e.key.toLowerCase();
     if (key === "a") placeBid("P1");
@@ -1535,11 +1513,42 @@ function checkUrlParamsForRoom() {
   if (roomCode) {
     const joinCodeInput = document.getElementById("input-join-code");
     if (joinCodeInput) joinCodeInput.value = roomCode.toUpperCase();
+    const previousName = sessionStorage.getItem(`movie-draft-name-${roomCode.toUpperCase()}`);
+    if (previousName) document.getElementById("input-join-name").value = previousName;
     openMpModal("join");
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  party = new PartyRoom({
+    toast: showToast,
+    onEnter: (room, role) => {
+      state.isMultiplayer = true;
+      state.roomCode = room.code;
+      state.myRole = role;
+      state.opponentMode = "online";
+      closeMpModal();
+    },
+    onLeave: () => {
+      state.isMultiplayer = false;
+      state.roomCode = null;
+      state.myRole = null;
+      state.opponentMode = "2p";
+      document.getElementById("mp-btn-label").textContent = "Play online";
+      document.getElementById("mp-status-dot")?.classList.remove("connected");
+      startNewDraft(false);
+    },
+    onChange: () => {},
+  });
+  const roomSize = document.getElementById("select-create-players");
+  const deckSelect = document.getElementById("select-create-deck");
+  roomSize?.addEventListener("change", () => {
+    const groupRoom = Number(roomSize.value) > 2;
+    deckSelect.disabled = groupRoom;
+    deckSelect.value = groupRoom ? "extended-shuffled" : "video-exact";
+    document.getElementById("party-deck-note")?.classList.toggle("hidden", !groupRoom);
+  });
+  roomSize?.dispatchEvent(new Event("change"));
   initEvents();
   startNewDraft(false);
   checkUrlParamsForRoom();

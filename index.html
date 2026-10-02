@@ -287,6 +287,8 @@
     </div>
   </main>
 
+  <main id="party-arena" class="party-arena hidden" aria-live="polite"></main>
+
   <footer class="site-credit">
     <a class="creator-button" href="https://www.instagram.com/vamshicreatess/" target="_blank" rel="noopener noreferrer">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -326,12 +328,22 @@
         </div>
 
         <div class="modal-form-group">
+          <label for="select-create-players">Players in Room</label>
+          <select id="select-create-players" class="modal-select">
+            <option value="2">2 players</option>
+            <option value="3" selected>3 players</option>
+            <option value="4">4 players</option>
+            <option value="5">5 players</option>
+          </select>
+        </div>
+
+        <div class="modal-form-group">
           <label for="select-create-star">Draft Hero</label>
           <select id="select-create-star" class="modal-select">
-            <option value="nani">Nani (16 Films)</option>
-            <option value="allu-arjun">Allu Arjun (10 Films)</option>
-            <option value="prabhas">Prabhas (10 Films)</option>
-            <option value="mahesh-babu">Mahesh Babu (10 Films)</option>
+            <option value="nani">Nani (40 Films)</option>
+            <option value="allu-arjun">Allu Arjun (27 Films)</option>
+            <option value="prabhas">Prabhas (29 Films)</option>
+            <option value="mahesh-babu">Mahesh Babu (37 Films)</option>
           </select>
         </div>
 
@@ -342,6 +354,7 @@
             <option value="video-shuffled">Shuffled (10 Films)</option>
             <option value="extended-shuffled">All Films (Shuffled)</option>
           </select>
+          <p id="party-deck-note" class="party-form-note">Rooms with 3–5 players use all films so everyone can draft 5 unique picks.</p>
         </div>
 
         <button id="btn-submit-create-room" class="nf-btn-red modal-submit-btn">
@@ -352,7 +365,7 @@
       <!-- Join Room Body -->
       <div id="mp-panel-join" class="modal-body-panel hidden">
         <div class="modal-form-group">
-          <label for="input-join-code">Room Code (4-8 chars)</label>
+          <label for="input-join-code">Room Code</label>
           <input type="text" id="input-join-code" class="modal-input code-input" placeholder="e.g. NANI24" maxlength="12" />
         </div>
 
@@ -387,6 +400,8 @@
             <span class="roster-name" id="roster-p2-name">Waiting...</span>
           </div>
         </div>
+
+        <button id="btn-party-start" class="nf-btn-red modal-submit-btn hidden">Start Draft</button>
 
         <button id="btn-modal-leave-room" class="nf-btn-ghost modal-leave-btn">
           Leave Room & Play Local
