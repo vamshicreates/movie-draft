@@ -206,7 +206,7 @@ wss.on("connection", (ws) => {
           payload,
           senderRole: clientMeta.role,
           senderName: clientMeta.name,
-        });
+        }, ws);
         return;
       }
 
@@ -217,7 +217,7 @@ wss.on("connection", (ws) => {
           emoji,
           senderRole: clientMeta.role,
           senderName: clientMeta.name,
-        });
+        }, ws);
         return;
       }
 

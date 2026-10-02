@@ -433,7 +433,7 @@ function handleMultiplayerMessage(data) {
     return;
   }
 
-  if (type === "ACTION_EVENT") {
+  if (type === "ACTION_EVENT" || type === "SYNC_ACTION") {
     const { action, payload } = data;
     handleRemoteAction(action, payload);
     return;
@@ -460,9 +460,13 @@ function handleRemoteAction(action, payload) {
   } else if (action === "SKIP_MOVIE") {
     advanceToNextMovie(false);
   } else if (action === "RESET_DRAFT") {
-    if (payload?.activeStarId) state.activeStarId = payload.activeStarId;
-    if (payload?.deckMode) state.deckMode = payload.deckMode;
-    startNewDraft(false);
+    if (payload?.gameState) {
+      syncFullGameState(payload.gameState);
+    } else {
+      if (payload?.activeStarId) state.activeStarId = payload.activeStarId;
+      if (payload?.deckMode) state.deckMode = payload.deckMode;
+      startNewDraft(false);
+    }
     showToast("🔄 Draft reset by host.");
   } else if (action === "VOTE") {
     if (payload.target === "P1") state.p1.votes += 1;
@@ -631,6 +635,7 @@ function startNewDraft(broadcast = true) {
       payload: {
         activeStarId: state.activeStarId,
         deckMode: state.deckMode,
+        gameState: getCurrentGameStatePayload(),
       },
     });
   }
@@ -721,15 +726,6 @@ function applyTeeskoLocally(passingPlayerKey, shouldBroadcast = true) {
     state.highBidder === winningPlayerKey ? state.currentBid : Math.min(state.currentBid, winner.budget);
 
   awardCurrentMovie(winningPlayerKey, finalPrice, shouldBroadcast);
-
-  if (shouldBroadcast && state.isMultiplayer && state.roomCode) {
-    sendMultiplayerMessage({
-      type: "SYNC_ACTION",
-      roomCode: state.roomCode,
-      action: "TEESKO",
-      payload: { passingPlayerKey },
-    });
-  }
 }
 
 function awardCurrentMovie(winnerKey, price, shouldBroadcast = true) {
@@ -773,7 +769,8 @@ function applyAwardLocally(winnerKey, price, shouldBroadcast = true) {
   setTimeout(() => {
     if (overlay) overlay.classList.add("hidden");
     state.isResolving = false;
-    advanceToNextMovie(shouldBroadcast);
+    // AWARD_MOVIE already causes both clients to advance after this animation.
+    advanceToNextMovie(false);
   }, 1050);
 }
 
