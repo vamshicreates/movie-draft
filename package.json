@@ -1,0 +1,14 @@
+{
+  "name": "movie-draft-auction",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Online Movie Draft & Movie Auction Arena (Hero & Heroine Edition, featuring Nani's Movies Draft)",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
+}

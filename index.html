@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Movie Draft — Hero Auction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css" />
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <!-- Authentic Cha-Ching SFX -->
+  <audio id="sfx-chaching" src="/sfx/chaching.mp3" preload="auto"></audio>
+
+  <!-- Minimal Netflix-Style Top Bar -->
+  <header class="nf-header">
+    <div class="nf-brand">
+      <span class="nf-logo-mark">M</span>
+      <h1 class="nf-title">MOVIE DRAFT</h1>
+      <span class="nf-divider"></span>
+      <span class="nf-tagline">₹20 Budget · 5 Movies Each</span>
+    </div>
+
+    <!-- Hero Selector Pills (Heroes Only) -->
+    <div id="star-pills-container" class="nf-hero-pills" aria-label="Select Hero">
+      <!-- Populated by app.js -->
+    </div>
+
+    <!-- Minimal Right Controls -->
+    <div class="nf-actions">
+      <button id="btn-mp-toggle" class="nf-btn-ghost nf-btn-mp" title="Play live with a friend across 2 devices">
+        <span class="mp-live-dot" id="mp-status-dot"></span>
+        <span id="mp-btn-label">🌐 Play Online</span>
+      </button>
+
+      <div class="nf-mode-switch" id="local-mode-switch">
+        <button id="mode-2p" class="nf-mode-btn active" data-mode="2p">2 Players</button>
+        <button id="mode-ai" class="nf-mode-btn" data-mode="ai">vs AI</button>
+      </div>
+      <select id="select-deck-order" class="nf-select" aria-label="Movie Order">
+        <option value="video-exact">Original Order (10)</option>
+        <option value="video-shuffled">Shuffled (10)</option>
+        <option value="extended-shuffled">All Films (Shuffled)</option>
+      </select>
+      <button id="btn-sound-toggle" class="nf-icon-btn" title="Toggle Sound">
+        <span id="sound-icon">🔊</span>
+      </button>
+      <button id="btn-reset-draft" class="nf-btn-ghost">
+        ↻ Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Single-Screen Movie Draft Arena -->
+  <main class="nf-arena">
+    <div class="nf-grid">
+      <!-- LEFT COLUMN: PLAYER 1 -->
+      <aside class="player-panel" id="board-p1">
+        <div class="player-top">
+          <div>
+            <span class="player-label">PLAYER 1</span>
+            <input type="text" id="input-p1-name" class="player-name-input" value="Player 1" aria-label="Player 1 Name" />
+          </div>
+          <div class="budget-pill" id="p1-budget-box">
+            <span class="budget-label">Budget</span>
+            <span class="budget-num" id="p1-budget-val">₹20</span>
+          </div>
+        </div>
+
+        <div class="budget-track">
+          <div class="budget-fill" id="p1-budget-bar" style="width: 100%"></div>
+        </div>
+
+        <ol class="slots-list" id="p1-slots-list">
+          <!-- 1..5 slots -->
+        </ol>
+      </aside>
+
+      <!-- CENTER COLUMN: ACTIVE MOVIE AUCTION -->
+      <section class="center-stage" aria-live="polite">
+        <!-- Room Status Strip (Shown when connected to online room) -->
+        <div id="room-status-strip" class="room-strip hidden">
+          <div class="room-strip-left">
+            <span class="room-live-pill">🔴 LIVE ROOM</span>
+            <span class="room-code-tag" id="strip-room-code">CODE: —</span>
+            <span class="room-role-tag" id="strip-user-role">YOU: P1</span>
+          </div>
+          <div class="room-strip-right">
+            <span id="strip-players-info" class="strip-info-text">P1 & P2 Connected</span>
+            <button id="btn-copy-room-link" class="nf-btn-ghost-sm" title="Copy Invite Link">🔗 Copy Link</button>
+            <button id="btn-leave-room-strip" class="nf-btn-ghost-sm" title="Exit room">✕ Leave</button>
+          </div>
+        </div>
+
+        <!-- Waiting for Player 2 Notice (Shown if P1 is host waiting for P2) -->
+        <div id="room-waiting-banner" class="waiting-banner hidden">
+          <div class="waiting-icon">⏳</div>
+          <div class="waiting-text">
+            <h4>Waiting for Player 2 to join...</h4>
+            <p>Share room code <strong id="wait-room-code-display" class="highlight-code">ABCD</strong> or copy the invite link to play on 2 devices.</p>
+          </div>
+          <button id="btn-copy-invite-action" class="nf-btn-red nf-btn-sm">Copy Invite Link</button>
+        </div>
+
+        <!-- Mobile Mini HUD (Budgets & Slots visible without scrolling) -->
+        <div class="mobile-hud" id="mobile-hud">
+          <div class="mobile-hud-player" id="mobile-hud-p1">
+            <span class="m-hud-name" id="m-hud-p1-name">P1</span>
+            <span class="m-hud-budget" id="m-hud-p1-budget">₹20</span>
+            <span class="m-hud-slots" id="m-hud-p1-slots">0/5</span>
+          </div>
+          <span class="m-hud-vs">VS</span>
+          <div class="mobile-hud-player" id="mobile-hud-p2">
+            <span class="m-hud-name" id="m-hud-p2-name">P2</span>
+            <span class="m-hud-budget" id="m-hud-p2-budget">₹20</span>
+            <span class="m-hud-slots" id="m-hud-p2-slots">0/5</span>
+          </div>
+        </div>
+
+        <!-- Active Draft Title & Progress -->
+        <div class="stage-topbar">
+          <h2 class="active-hero-heading" id="arena-star-title">Nani's Movies Draft</h2>
+          <div class="stage-meta-right">
+            <span class="round-badge" id="round-counter-pill">FILM 1 / 10</span>
+            <span class="status-text" id="turn-status-pill">Opening Bid: ₹1</span>
+          </div>
+        </div>
+
+        <!-- Movie Spotlight Card -->
+        <div class="spotlight-wrap" id="spotlight-stage">
+          <!-- Sold Overlay -->
+          <div id="sold-stamp-overlay" class="sold-overlay hidden">
+            <div class="sold-box">
+              <span class="sold-tag">SOLD</span>
+              <h3 id="sold-stamp-title">PLAYER 2</h3>
+              <p id="sold-stamp-price">₹9</p>
+            </div>
+          </div>
+
+          <div class="movie-showcase">
+            <!-- Poster + Live Bid Overlay -->
+            <div class="poster-column">
+              <div class="live-bid-banner">
+                <span id="live-bid-who" class="bid-who">CURRENT BID</span>
+                <span id="live-bid-amount" class="bid-amt">₹1</span>
+              </div>
+              <div class="poster-frame">
+                <img id="current-movie-poster" class="poster-img" src="/posters/nani/jersey.jpg" alt="Movie Poster" />
+              </div>
+            </div>
+
+            <!-- Clean Film Details + Bidding Paddles -->
+            <div class="details-column">
+              <div class="meta-chips">
+                <span class="meta-chip" id="current-movie-year">2019</span>
+                <span class="meta-chip" id="current-movie-imdb">★ 8.5</span>
+                <span class="meta-chip meta-chip-verdict" id="current-movie-verdict">2x National Award Winner</span>
+              </div>
+
+              <h3 class="movie-title" id="current-movie-title">Jersey</h3>
+              <p class="movie-credits" id="current-movie-character">Role: <strong>Arjun</strong> · Dir: <strong>Gowtam Tinnanuri</strong></p>
+              <div class="genre-row" id="current-movie-genres"></div>
+              <p class="movie-synopsis" id="current-movie-tagline"></p>
+
+              <!-- Bidding Console -->
+              <div class="bidding-box">
+                <!-- Player 1 Controls -->
+                <div class="bid-col" id="paddle-p1">
+                  <div class="bid-col-head">
+                    <span id="paddle-p1-name">Player 1</span>
+                    <span id="paddle-p1-max" class="bid-col-budget">₹20 left</span>
+                  </div>
+                  <div class="bid-btn-row">
+                    <button id="btn-p1-bid-next" class="nf-btn-red">
+                      Bid <span id="p1-next-bid-label">₹1</span>
+                    </button>
+                    <button id="btn-p1-bid-plus2" class="nf-btn-plus">+₹2</button>
+                  </div>
+                  <button id="btn-p1-teesko" class="nf-btn-teesko" disabled>
+                    “Teesko!” (Pass to P2)
+                  </button>
+                </div>
+
+                <!-- Bid Trail -->
+                <div class="bid-history-col">
+                  <span class="history-label">BIDS</span>
+                  <div id="bid-chips-flow" class="history-list">
+                    <span class="empty-trail">Start at ₹1</span>
+                  </div>
+                </div>
+
+                <!-- Player 2 Controls -->
+                <div class="bid-col" id="paddle-p2">
+                  <div class="bid-col-head">
+                    <span id="paddle-p2-name">Player 2</span>
+                    <span id="paddle-p2-max" class="bid-col-budget">₹20 left</span>
+                  </div>
+                  <div class="bid-btn-row">
+                    <button id="btn-p2-bid-next" class="nf-btn-red">
+                      Bid <span id="p2-next-bid-label">₹1</span>
+                    </button>
+                    <button id="btn-p2-bid-plus2" class="nf-btn-plus">+₹2</button>
+                  </div>
+                  <button id="btn-p2-teesko" class="nf-btn-teesko" disabled>
+                    “Teesko!” (Pass to P1)
+                  </button>
+                </div>
+              </div>
+
+              <!-- Auto-Claim Banner when opponent has ₹0 budget or 5/5 full -->
+              <div id="special-rule-banner" class="special-banner hidden">
+                <p id="special-rule-text"></p>
+                <div id="special-rule-actions" class="special-actions"></div>
+              </div>
+
+              <!-- Live Reactions Bar -->
+              <div class="reaction-bar" id="reaction-bar" aria-label="Send Reaction">
+                <span class="reaction-label">Quick Reactions:</span>
+                <button class="btn-react" data-emoji="🔥">🔥</button>
+                <button class="btn-react" data-emoji="💰">💰</button>
+                <button class="btn-react" data-emoji="🍿">🍿</button>
+                <button class="btn-react" data-emoji="👏">👏</button>
+                <button class="btn-react" data-emoji="🏆">🏆</button>
+                <button class="btn-react btn-react-text" data-emoji="🗣️ Teesko!">Teesko!</button>
+              </div>
+
+              <div class="stage-footer">
+                <span class="keys-hint" id="footer-keys-hint">Shortcuts: <kbd>A</kbd> P1 Bid · <kbd>S</kbd> P1 Teesko · <kbd>K</kbd> P2 Bid · <kbd>L</kbd> P2 Teesko</span>
+                <button id="btn-skip-movie" class="skip-link">Skip Film</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final Results Panel (Shown when all 10 slots filled) -->
+        <div id="draft-complete-panel" class="complete-panel hidden">
+          <div class="complete-head">
+            <span class="complete-badge">DRAFT COMPLETE</span>
+            <h3 id="showdown-headline">Final 5-Movie Lineups</h3>
+            <p>Vote on who built the stronger 5-movie roster.</p>
+          </div>
+
+          <div class="poll-grid">
+            <div class="poll-box">
+              <div class="poll-box-head">
+                <h4 id="poll-p1-title">Player 1</h4>
+                <span class="score-pill" id="poll-p1-score">0 PTS</span>
+              </div>
+              <div class="poll-meta" id="poll-p1-metrics"></div>
+              <button id="btn-vote-p1" class="nf-btn-red">Vote Player 1 (<span id="votes-p1-count">50%</span>)</button>
+            </div>
+
+            <div class="poll-box">
+              <div class="poll-box-head">
+                <h4 id="poll-p2-title">Player 2</h4>
+                <span class="score-pill" id="poll-p2-score">0 PTS</span>
+              </div>
+              <div class="poll-meta" id="poll-p2-metrics"></div>
+              <button id="btn-vote-p2" class="nf-btn-red">Vote Player 2 (<span id="votes-p2-count">50%</span>)</button>
+            </div>
+          </div>
+
+          <div class="complete-actions">
+            <button id="btn-play-again" class="nf-btn-red">Play Again</button>
+            <button id="btn-copy-summary" class="nf-btn-ghost">Copy Poll Summary</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: PLAYER 2 -->
+      <aside class="player-panel" id="board-p2">
+        <div class="player-top">
+          <div>
+            <span class="player-label">PLAYER 2</span>
+            <input type="text" id="input-p2-name" class="player-name-input" value="Player 2" aria-label="Player 2 Name" />
+          </div>
+          <div class="budget-pill" id="p2-budget-box">
+            <span class="budget-label">Budget</span>
+            <span class="budget-num" id="p2-budget-val">₹20</span>
+          </div>
+        </div>
+
+        <div class="budget-track">
+          <div class="budget-fill" id="p2-budget-bar" style="width: 100%"></div>
+        </div>
+
+        <ol class="slots-list" id="p2-slots-list">
+          <!-- 1..5 slots -->
+        </ol>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Multiplayer Modal -->
+  <div id="mp-modal-backdrop" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div class="modal-title-wrap">
+          <span class="nf-logo-mark modal-logo">M</span>
+          <h3>Online Movie Draft Room</h3>
+        </div>
+        <button id="btn-close-mp-modal" class="modal-close" aria-label="Close">✕</button>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="modal-tabs" id="mp-modal-tabs">
+        <button id="tab-mp-create" class="modal-tab active" data-tab="create">Create Room</button>
+        <button id="tab-mp-join" class="modal-tab" data-tab="join">Join Room</button>
+      </div>
+
+      <!-- Create Room Body -->
+      <div id="mp-panel-create" class="modal-body-panel">
+        <div class="modal-form-group">
+          <label for="input-create-name">Your Name</label>
+          <input type="text" id="input-create-name" class="modal-input" placeholder="e.g. Vamshi" value="Player 1" />
+        </div>
+
+        <div class="modal-form-group">
+          <label for="select-create-star">Draft Hero</label>
+          <select id="select-create-star" class="modal-select">
+            <option value="nani">Nani (16 Films)</option>
+            <option value="allu-arjun">Allu Arjun (10 Films)</option>
+            <option value="prabhas">Prabhas (10 Films)</option>
+            <option value="mahesh-babu">Mahesh Babu (10 Films)</option>
+          </select>
+        </div>
+
+        <div class="modal-form-group">
+          <label for="select-create-deck">Draft Mode</label>
+          <select id="select-create-deck" class="modal-select">
+            <option value="video-exact">Original Order (10 Films)</option>
+            <option value="video-shuffled">Shuffled (10 Films)</option>
+            <option value="extended-shuffled">All Films (Shuffled)</option>
+          </select>
+        </div>
+
+        <button id="btn-submit-create-room" class="nf-btn-red modal-submit-btn">
+          Create Room & Host Draft
+        </button>
+      </div>
+
+      <!-- Join Room Body -->
+      <div id="mp-panel-join" class="modal-body-panel hidden">
+        <div class="modal-form-group">
+          <label for="input-join-code">Room Code (4-8 chars)</label>
+          <input type="text" id="input-join-code" class="modal-input code-input" placeholder="e.g. NANI24" maxlength="12" />
+        </div>
+
+        <div class="modal-form-group">
+          <label for="input-join-name">Your Name</label>
+          <input type="text" id="input-join-name" class="modal-input" placeholder="e.g. Rahul" value="Player 2" />
+        </div>
+
+        <button id="btn-submit-join-room" class="nf-btn-red modal-submit-btn">
+          Join Room
+        </button>
+      </div>
+
+      <!-- Active Room In-Session View -->
+      <div id="mp-panel-active" class="modal-body-panel hidden">
+        <div class="active-room-box">
+          <span class="active-room-label">ROOM CODE</span>
+          <div class="active-room-code-row">
+            <span id="modal-active-room-code" class="active-code-display">NANI24</span>
+            <button id="btn-modal-copy-link" class="nf-btn-ghost">Copy Link</button>
+          </div>
+          <p class="active-room-hint">Open this on your phone or send link to a friend on another device.</p>
+        </div>
+
+        <div class="active-room-roster">
+          <div class="roster-item" id="roster-p1">
+            <span class="roster-role">Host (Player 1):</span>
+            <span class="roster-name" id="roster-p1-name">Connected</span>
+          </div>
+          <div class="roster-item" id="roster-p2">
+            <span class="roster-role">Guest (Player 2):</span>
+            <span class="roster-name" id="roster-p2-name">Waiting...</span>
+          </div>
+        </div>
+
+        <button id="btn-modal-leave-room" class="nf-btn-ghost modal-leave-btn">
+          Leave Room & Play Local
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+  <div id="reactions-container" class="reactions-container" aria-hidden="true"></div>
+
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
