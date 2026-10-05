@@ -32,6 +32,7 @@ function loadPoster(src) {
   return new Promise((resolve) => {
     if (!src) return resolve(null);
     const image = new Image();
+    image.crossOrigin = "anonymous";
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
     image.src = src;
