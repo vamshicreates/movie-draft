@@ -1,4 +1,5 @@
 import { addFilmographyCredits } from "./filmographyExtras.js";
+import { addAdditionalStars } from "./additionalStars.js";
 
 // Complete Filmography, Auction Rules & Verbatim Video Transcript Data
 // For Movie Draft / Movie Auction (Hero & Heroine Edition)
@@ -1773,3 +1774,4 @@ export const STARS_CATALOG = [
 ];
 
 addFilmographyCredits(STARS_CATALOG);
+addAdditionalStars(STARS_CATALOG);

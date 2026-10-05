@@ -109,6 +109,10 @@ body {
   min-width: 0;
 }
 
+.star-category-tab { flex: none; position: sticky; z-index: 2; left: 0; border: 1px solid var(--nf-border-bright); border-radius: 999px; background: #171717; color: var(--nf-silver); padding: .42rem .7rem; font: 800 .7rem var(--font-sans); cursor: pointer; }
+.star-category-tab:nth-child(2) { left: 66px; }
+.star-category-tab.active { background: #fff; color: #111; }
+
 .hero-pill {
   display: inline-flex;
   align-items: center;
@@ -1597,7 +1601,7 @@ kbd {
 .party-player-progress { height: 3px; border-radius: 4px; background: #333; margin: .48rem 0; overflow: hidden; }
 .party-player-progress span { display: block; height: 100%; background: var(--nf-red); }
 .party-picks { display: flex; align-items: center; gap: .25rem; }
-.party-pick { width: 19%; height: 50px; min-width: 0; overflow: hidden; border-radius: 4px; position: relative; background: #303030; }
+.party-pick { flex: 1 1 0; height: 50px; min-width: 0; overflow: hidden; border-radius: 4px; position: relative; background: #303030; }
 .party-pick img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .party-pick span { position: absolute; inset: auto 0 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .48rem; background: linear-gradient(transparent, #000); padding: 9px 2px 2px; }
 .party-pick.party-empty { display: grid; place-items: center; color: #777; border: 1px dashed #555; font: 700 .75rem var(--font-mono); }
@@ -1986,4 +1990,5 @@ kbd {
   .party-player { flex-basis: min(210px, 58vw); padding: .5rem; }
   .party-pick { height: 38px; }
   .party-poster img { width: min(40vw, 150px); max-height: 26svh; }
+  .party-results-grid { grid-template-columns: minmax(0, 1fr); }
 }

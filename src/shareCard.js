@@ -54,7 +54,7 @@ function drawPoster(ctx, image, x, y, width, height) {
   ctx.restore();
 }
 
-function drawLineup(ctx, player, images, label, x) {
+function drawLineup(ctx, player, images, label, x, initialBudget, slotCount) {
   const y = 270;
   const width = 478;
   ctx.fillStyle = "#1B1B1B";
@@ -75,36 +75,39 @@ function drawLineup(ctx, player, images, label, x) {
   fitText(ctx, player.name, x + 105, y + 55, width - 137);
   ctx.fillStyle = MUTED;
   ctx.font = `600 21px ${FONT}`;
-  ctx.fillText(`₹${player.budget} left from ₹20`, x + 28, y + 97);
+  ctx.fillText(`₹${player.budget} left from ₹${initialBudget}`, x + 28, y + 97);
 
-  for (let index = 0; index < 5; index += 1) {
-    const rowY = y + 130 + index * 135;
+  const rowHeight = Math.floor(675 / slotCount);
+  for (let index = 0; index < slotCount; index += 1) {
+    const rowY = y + 130 + index * rowHeight;
     const slot = player.slots[index];
 
     ctx.fillStyle = index % 2 === 0 ? "#242424" : "#202020";
-    roundedRect(ctx, x + 22, rowY, width - 44, 119, 12);
+    roundedRect(ctx, x + 22, rowY, width - 44, rowHeight - 16, 12);
     ctx.fill();
 
     ctx.fillStyle = "#888888";
     ctx.font = `700 20px ${FONT}`;
-    ctx.fillText(`${index + 1}.`, x + 39, rowY + 69);
+    ctx.fillText(`${index + 1}.`, x + 39, rowY + rowHeight / 2);
 
-    drawPoster(ctx, images[index], x + 76, rowY + 9, 72, 101);
+    const posterHeight = rowHeight - 34;
+    const posterWidth = Math.round(posterHeight * 0.72);
+    drawPoster(ctx, images[index], x + 76, rowY + 9, posterWidth, posterHeight);
     ctx.fillStyle = WHITE;
-    ctx.font = `800 25px ${FONT}`;
-    fitText(ctx, slot?.movie?.shortTitle || slot?.movie?.title || "Open slot", x + 166, rowY + 51, width - 203);
+    ctx.font = `800 ${slotCount > 5 ? 21 : 25}px ${FONT}`;
+    fitText(ctx, slot?.movie?.shortTitle || slot?.movie?.title || "Open slot", x + 95 + posterWidth, rowY + rowHeight / 2 - 7, width - 132 - posterWidth);
     if (slot) {
       ctx.fillStyle = MUTED;
-      ctx.font = `600 20px ${FONT}`;
-      ctx.fillText(`Won for ₹${slot.price}`, x + 166, rowY + 84);
+      ctx.font = `600 ${slotCount > 5 ? 17 : 20}px ${FONT}`;
+      ctx.fillText(`Won for ₹${slot.price}`, x + 95 + posterWidth, rowY + rowHeight / 2 + 20);
     }
   }
 }
 
-export async function createResultCard(starName, p1, p2) {
+export async function createResultCard(starName, p1, p2, initialBudget = 20, slotCount = 5) {
   if (document.fonts?.ready) await document.fonts.ready;
   const posters = await Promise.all(
-    [p1, p2].map((player) => Promise.all(player.slots.slice(0, 5).map((slot) => loadPoster(slot.movie.poster))))
+    [p1, p2].map((player) => Promise.all(player.slots.slice(0, slotCount).map((slot) => loadPoster(slot.movie.poster))))
   );
 
   const canvas = document.createElement("canvas");
@@ -132,10 +135,10 @@ export async function createResultCard(starName, p1, p2) {
   ctx.fillText("Who drafted better?", 50, 188);
   ctx.fillStyle = MUTED;
   ctx.font = `600 27px ${FONT}`;
-  fitText(ctx, `${starName} movies · ₹20 budget · 5 picks each`, 52, 229, 975);
+  fitText(ctx, `${starName} movies · ₹${initialBudget} budget · ${slotCount} picks each`, 52, 229, 975);
 
-  drawLineup(ctx, p1, posters[0], "P1", 50);
-  drawLineup(ctx, p2, posters[1], "P2", 552);
+  drawLineup(ctx, p1, posters[0], "P1", 50, initialBudget, slotCount);
+  drawLineup(ctx, p2, posters[1], "P2", 552, initialBudget, slotCount);
 
   ctx.fillStyle = RED;
   roundedRect(ctx, 50, 1198, 980, 101, 16);
@@ -155,7 +158,7 @@ export async function createResultCard(starName, p1, p2) {
 }
 
 // A portrait image that stays legible when a room has three to five lineups.
-export async function createPartyResultCard(starName, players) {
+export async function createPartyResultCard(starName, players, initialBudget = 20, slotCount = 5) {
   if (document.fonts?.ready) await document.fonts.ready;
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -176,7 +179,7 @@ export async function createPartyResultCard(starName, players) {
   ctx.fillText("Who drafted better?", 54, 173);
   ctx.fillStyle = MUTED;
   ctx.font = `600 26px ${FONT}`;
-  fitText(ctx, `${starName} · ₹20 each · 5 films each`, 56, 216, 970);
+  fitText(ctx, `${starName} · ₹${initialBudget} each · ${slotCount} films each`, 56, 216, 970);
 
   const cols = 2;
   const cardW = 476;
@@ -204,19 +207,19 @@ export async function createPartyResultCard(starName, players) {
     ctx.fillStyle = MUTED;
     ctx.font = `600 17px ${FONT}`;
     ctx.fillText(`₹${player.budget} remaining`, x + 20, y + 82);
-    const rowH = players.length <= 2 ? 185 : 78;
-    for (let j = 0; j < 5; j += 1) {
+    const rowH = Math.floor((cardH - 120) / slotCount);
+    for (let j = 0; j < slotCount; j += 1) {
       const slot = player.slots[j];
       const rowY = y + 104 + j * rowH;
-      const imgW = players.length <= 2 ? 91 : 48;
-      const imgH = players.length <= 2 ? 135 : 66;
+      const imgH = Math.min(players.length <= 2 ? 135 : 66, rowH - 8);
+      const imgW = Math.round(imgH * .72);
       drawPoster(ctx, posters[i]?.[j], x + 18, rowY, imgW, imgH);
       ctx.fillStyle = WHITE;
-      ctx.font = `800 ${players.length <= 2 ? 25 : 20}px ${FONT}`;
-      fitText(ctx, slot?.movie?.shortTitle || slot?.movie?.title || "Open slot", x + imgW + 30, rowY + (players.length <= 2 ? 55 : 29), cardW - imgW - 51);
+      ctx.font = `800 ${players.length <= 2 ? 25 : slotCount > 5 ? 17 : 20}px ${FONT}`;
+      fitText(ctx, slot?.movie?.shortTitle || slot?.movie?.title || "Open slot", x + imgW + 30, rowY + Math.min(players.length <= 2 ? 55 : 29, rowH / 2), cardW - imgW - 51);
       ctx.fillStyle = MUTED;
       ctx.font = `600 ${players.length <= 2 ? 19 : 16}px ${FONT}`;
-      if (slot) ctx.fillText(`₹${slot.price}`, x + imgW + 30, rowY + (players.length <= 2 ? 86 : 53));
+      if (slot) ctx.fillText(`₹${slot.price}`, x + imgW + 30, rowY + Math.min(players.length <= 2 ? 86 : 53, rowH - 7));
     }
   }
   ctx.fillStyle = RED;

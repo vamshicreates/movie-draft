@@ -2,8 +2,7 @@ import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
 import { createResultCard } from "./shareCard.js";
 import { PartyRoom } from "./partyRoom.js";
 
-// Keep only Heroes for this minimal version
-const HEROES_LIST = STARS_CATALOG.filter((s) => s.category === "Hero");
+const DRAFT_STARS = STARS_CATALOG.filter((star) => star.category === "Hero" || star.category === "Heroine");
 
 function makeSvgPoster(title, year = "", subtitle = "Movie Draft") {
   const safeTitle = String(title).replace(/[<>&"']/g, "");
@@ -25,8 +24,11 @@ function makeSvgPoster(title, year = "", subtitle = "Movie Draft") {
 }
 
 const state = {
-  stars: HEROES_LIST,
+  stars: DRAFT_STARS,
   activeStarId: "nani",
+  starCategory: "Hero",
+  startingBudget: GAME_CONFIG.defaultBudget,
+  slotCount: GAME_CONFIG.slotsPerPlayer,
   deckMode: "video-exact",
   opponentMode: "2p", // "2p" | "ai" | "online"
   soundEnabled: true,
@@ -601,6 +603,7 @@ function buildMoviePool(star, mode) {
     .filter((m) => m.inVideoDraft)
     .sort((a, b) => (a.videoOrder || 99) - (b.videoOrder || 99));
 
+  if (state.slotCount > 5 || videoMovies.length < 10) return shuffleArray(allMovies);
   if (mode === "video-exact") {
     return videoMovies.length >= 10 ? videoMovies : allMovies.slice(0, 10);
   }
@@ -611,8 +614,22 @@ function buildMoviePool(star, mode) {
   return shuffleArray(allMovies);
 }
 
+function updateLocalDeckOptions() {
+  const videoFilms = getActiveStar().movies.filter((movie) => movie.inVideoDraft).length;
+  const useFullCatalog = state.slotCount > 5 || videoFilms < 10;
+  const select = document.getElementById("select-deck-order");
+  if (!select) return;
+  for (const option of select.options) {
+    if (option.value !== "extended-shuffled") option.disabled = useFullCatalog;
+  }
+  if (useFullCatalog) state.deckMode = "extended-shuffled";
+  select.value = state.deckMode;
+}
+
 function startNewDraft(broadcast = true) {
   const star = getActiveStar();
+  if (!star.movies.length) return showToast(`${star.name} has no available films yet.`);
+  updateLocalDeckOptions();
   state.pool = buildMoviePool(star, state.deckMode);
   state.currentIndex = 0;
   state.currentBid = 0;
@@ -632,10 +649,10 @@ function startNewDraft(broadcast = true) {
     }
   }
 
-  state.p1.budget = GAME_CONFIG.defaultBudget;
+  state.p1.budget = state.startingBudget;
   state.p1.slots = [];
 
-  state.p2.budget = GAME_CONFIG.defaultBudget;
+  state.p2.budget = state.startingBudget;
   state.p2.slots = [];
 
   renderAll();
@@ -661,6 +678,12 @@ function getCurrentMovie() {
   return state.pool[state.currentIndex] || null;
 }
 
+function canReceiveMovie(player, movie) {
+  return Boolean(movie) && player.slots.length < state.slotCount &&
+    (getActiveStar().movies.length < state.slotCount ||
+      !player.slots.some((slot) => slot.movie.id === movie.id));
+}
+
 function canPlayerControl(playerKey) {
   if (!state.isMultiplayer) return true;
   return state.myRole === playerKey;
@@ -681,8 +704,8 @@ function applyBidLocally(playerKey, customAmount = null, shouldBroadcast = true)
   if (!movie) return;
 
   const bidder = playerKey === "P1" ? state.p1 : state.p2;
-  if (bidder.slots.length >= GAME_CONFIG.slotsPerPlayer) {
-    showToast(`${bidder.name} already has 5 movies.`);
+  if (!canReceiveMovie(bidder, movie)) {
+    showToast(`${bidder.name} cannot draft this film again or has a full lineup.`);
     return;
   }
 
@@ -730,8 +753,8 @@ function applyTeeskoLocally(passingPlayerKey, shouldBroadcast = true) {
   const winningPlayerKey = passingPlayerKey === "P1" ? "P2" : "P1";
   const winner = winningPlayerKey === "P1" ? state.p1 : state.p2;
 
-  if (winner.slots.length >= GAME_CONFIG.slotsPerPlayer) {
-    showToast(`${winner.name}'s 5 slots are full.`);
+  if (!canReceiveMovie(winner, getCurrentMovie())) {
+    showToast(`${winner.name} cannot draft this film again.`);
     return;
   }
 
@@ -752,6 +775,10 @@ function applyAwardLocally(winnerKey, price, shouldBroadcast = true) {
 
   state.isResolving = true;
   const winner = winnerKey === "P1" ? state.p1 : state.p2;
+  if (!canReceiveMovie(winner, movie)) {
+    state.isResolving = false;
+    return;
+  }
   const actualPrice = Math.max(0, Math.min(price, winner.budget));
 
   winner.budget -= actualPrice;
@@ -788,8 +815,8 @@ function applyAwardLocally(winnerKey, price, shouldBroadcast = true) {
 }
 
 function advanceToNextMovie(shouldBroadcast = true) {
-  const p1Full = state.p1.slots.length >= GAME_CONFIG.slotsPerPlayer;
-  const p2Full = state.p2.slots.length >= GAME_CONFIG.slotsPerPlayer;
+  const p1Full = state.p1.slots.length >= state.slotCount;
+  const p2Full = state.p2.slots.length >= state.slotCount;
 
   if (p1Full && p2Full) {
     state.draftFinished = true;
@@ -797,16 +824,14 @@ function advanceToNextMovie(shouldBroadcast = true) {
     return;
   }
 
-  if (state.currentIndex + 1 < state.pool.length) {
+  do {
     state.currentIndex += 1;
-    state.currentBid = 0;
-    state.highBidder = null;
-    state.bidHistory = [];
-    renderAll();
-  } else {
-    state.draftFinished = true;
-    renderAll();
-  }
+    if (state.currentIndex >= state.pool.length) state.pool.push(...shuffleArray(getActiveStar().movies));
+  } while (!canReceiveMovie(state.p1, getCurrentMovie()) && !canReceiveMovie(state.p2, getCurrentMovie()));
+  state.currentBid = 0;
+  state.highBidder = null;
+  state.bidHistory = [];
+  renderAll();
 
   if (shouldBroadcast && state.isMultiplayer && state.roomCode) {
     sendMultiplayerMessage({
@@ -831,13 +856,13 @@ function scheduleAiDecision() {
     if (!movie) return;
 
     const ai = state.p2;
-    if (ai.slots.length >= GAME_CONFIG.slotsPerPlayer || ai.budget <= state.currentBid) {
+    if (!canReceiveMovie(ai, movie) || ai.budget <= state.currentBid) {
       showToast(`AI: "Teesko! Take ${movie.shortTitle || movie.title} for ₹${state.currentBid}."`);
       handleTeesko("P2");
       return;
     }
 
-    const slotsLeft = GAME_CONFIG.slotsPerPlayer - ai.slots.length;
+    const slotsLeft = state.slotCount - ai.slots.length;
     const reserveNeeded = Math.max(0, slotsLeft - 1);
     const maxAffordable = Math.max(1, ai.budget - reserveNeeded);
     const valuation = Math.min(ai.budget, Math.min(maxAffordable + 2, movie.baseValue || 6));
@@ -858,9 +883,21 @@ function scheduleAiDecision() {
 function renderHeroSelector() {
   const container = document.getElementById("star-pills-container");
   if (!container) return;
+  const scrollLeft = container.scrollLeft;
   container.innerHTML = "";
-
-  state.stars.forEach((star) => {
+  for (const category of ["Hero", "Heroine"]) {
+    const tab = document.createElement("button");
+    tab.className = `star-category-tab ${state.starCategory === category ? "active" : ""}`;
+    tab.textContent = category === "Hero" ? "Heroes" : "Heroines";
+    tab.setAttribute("aria-pressed", String(state.starCategory === category));
+    tab.addEventListener("click", () => {
+      state.starCategory = category;
+      container.scrollLeft = 0;
+      renderHeroSelector();
+    });
+    container.appendChild(tab);
+  }
+  state.stars.filter((star) => star.category === state.starCategory).forEach((star) => {
     const btn = document.createElement("button");
     btn.className = `hero-pill ${star.id === state.activeStarId ? "active" : ""}`;
     const avatarSrc = star.avatarPoster || makeSvgPoster(star.name, "", star.moniker);
@@ -879,6 +916,7 @@ function renderHeroSelector() {
     });
     container.appendChild(btn);
   });
+  container.scrollLeft = scrollLeft;
 }
 
 function renderPlayerBoards() {
@@ -901,13 +939,13 @@ function renderPlayerBoards() {
     if (budgetVal) budgetVal.textContent = `₹${player.budget}`;
     if (budgetBox) budgetBox.classList.toggle("budget-zero", player.budget === 0);
     if (budgetBar) {
-      const pct = Math.max(0, Math.min(100, (player.budget / GAME_CONFIG.defaultBudget) * 100));
+      const pct = Math.max(0, Math.min(100, (player.budget / state.startingBudget) * 100));
       budgetBar.style.width = `${pct}%`;
     }
 
     if (slotsList) {
       slotsList.innerHTML = "";
-      for (let i = 0; i < GAME_CONFIG.slotsPerPlayer; i++) {
+      for (let i = 0; i < state.slotCount; i++) {
         const entry = player.slots[i];
         const li = document.createElement("li");
         if (entry) {
@@ -947,11 +985,11 @@ function renderPlayerBoards() {
 
   if (mP1Name) mP1Name.textContent = state.p1.name.slice(0, 8);
   if (mP1Budget) mP1Budget.textContent = `₹${state.p1.budget}`;
-  if (mP1Slots) mP1Slots.textContent = `${state.p1.slots.length}/5`;
+  if (mP1Slots) mP1Slots.textContent = `${state.p1.slots.length}/${state.slotCount}`;
 
   if (mP2Name) mP2Name.textContent = state.p2.name.slice(0, 8);
   if (mP2Budget) mP2Budget.textContent = `₹${state.p2.budget}`;
-  if (mP2Slots) mP2Slots.textContent = `${state.p2.slots.length}/5`;
+  if (mP2Slots) mP2Slots.textContent = `${state.p2.slots.length}/${state.slotCount}`;
 }
 
 function renderCenterStage() {
@@ -1001,8 +1039,8 @@ function renderCenterStage() {
   if (posterImg) posterImg.alt = `${movie.title} poster`;
 
   const nextBidAmt = state.highBidder === null ? 1 : state.currentBid + 1;
-  const p1CanBid = state.p1.slots.length < 5 && state.p1.budget >= nextBidAmt && state.highBidder !== "P1";
-  const p2CanBid = state.p2.slots.length < 5 && state.p2.budget >= nextBidAmt && state.highBidder !== "P2";
+  const p1CanBid = canReceiveMovie(state.p1, movie) && state.p1.budget >= nextBidAmt && state.highBidder !== "P1";
+  const p2CanBid = canReceiveMovie(state.p2, movie) && state.p2.budget >= nextBidAmt && state.highBidder !== "P2";
 
   document.getElementById("paddle-p1-name").textContent = state.p1.name;
   document.getElementById("paddle-p1-max").textContent = `₹${state.p1.budget} left`;
@@ -1022,23 +1060,23 @@ function renderCenterStage() {
   document.getElementById("btn-p1-bid-plus2").disabled =
     !allowP1 ||
     !(
-      state.p1.slots.length < 5 &&
+      canReceiveMovie(state.p1, movie) &&
       state.p1.budget >= state.currentBid + 2 &&
       state.highBidder !== "P1"
     );
   document.getElementById("btn-p1-teesko").disabled =
-    !allowP1 || !(state.highBidder === "P2" && state.p2.slots.length < 5);
+    !allowP1 || !(state.highBidder === "P2" && canReceiveMovie(state.p2, movie));
 
   document.getElementById("btn-p2-bid-next").disabled = !allowP2 || !p2CanBid;
   document.getElementById("btn-p2-bid-plus2").disabled =
     !allowP2 ||
     !(
-      state.p2.slots.length < 5 &&
+      canReceiveMovie(state.p2, movie) &&
       state.p2.budget >= state.currentBid + 2 &&
       state.highBidder !== "P2"
     );
   document.getElementById("btn-p2-teesko").disabled =
-    !allowP2 || !(state.highBidder === "P1" && state.p1.slots.length < 5);
+    !allowP2 || !(state.highBidder === "P1" && canReceiveMovie(state.p1, movie));
 
   const chipsFlow = document.getElementById("bid-chips-flow");
   if (chipsFlow) {
@@ -1059,12 +1097,12 @@ function renderCenterStage() {
 
   if (specialBanner && specialText && specialActions) {
     specialActions.innerHTML = "";
-    const p1Full = state.p1.slots.length >= 5;
-    const p2Full = state.p2.slots.length >= 5;
+    const p1Full = !canReceiveMovie(state.p1, movie);
+    const p2Full = !canReceiveMovie(state.p2, movie);
 
     if (p1Full && !p2Full) {
       specialBanner.classList.remove("hidden");
-      specialText.textContent = `${state.p1.name}'s 5 slots are full — ${state.p2.name} gets ${movie.shortTitle || movie.title} for ₹0.`;
+      specialText.textContent = `${state.p1.name} cannot draft this film — ${state.p2.name} can claim it for ₹0.`;
       if (allowP2) {
         const btn = document.createElement("button");
         btn.className = "nf-btn-red";
@@ -1074,7 +1112,7 @@ function renderCenterStage() {
       }
     } else if (p2Full && !p1Full) {
       specialBanner.classList.remove("hidden");
-      specialText.textContent = `${state.p2.name}'s 5 slots are full — ${state.p1.name} gets ${movie.shortTitle || movie.title} for ₹0.`;
+      specialText.textContent = `${state.p2.name} cannot draft this film — ${state.p1.name} can claim it for ₹0.`;
       if (allowP1) {
         const btn = document.createElement("button");
         btn.className = "nf-btn-red";
@@ -1134,11 +1172,11 @@ function setShareStatus(message) {
 
 function renderResultLineup(player, prefix) {
   document.getElementById(`poll-${prefix}-title`).textContent = player.name;
-  document.getElementById(`poll-${prefix}-budget`).textContent = `₹${player.budget} left from ₹20`;
+  document.getElementById(`poll-${prefix}-budget`).textContent = `₹${player.budget} left from ₹${state.startingBudget}`;
 
   const list = document.getElementById(`poll-${prefix}-lineup`);
   list.replaceChildren();
-  for (let index = 0; index < 5; index += 1) {
+  for (let index = 0; index < state.slotCount; index += 1) {
     const slot = player.slots[index];
     const item = document.createElement("li");
     item.className = "result-film";
@@ -1177,7 +1215,7 @@ function prepareResultCard() {
     budget: player.budget,
     slots: player.slots.map((slot) => ({ movie: slot.movie, price: slot.price })),
   }));
-  const key = JSON.stringify([star.id, players]);
+  const key = JSON.stringify([star.id, state.startingBudget, state.slotCount, players]);
   if (key === resultCardKey) return;
   resultCardKey = key;
   resultCardBlob = null;
@@ -1188,7 +1226,7 @@ function prepareResultCard() {
   document.getElementById("btn-download-results").disabled = true;
   setShareStatus("Preparing result image…");
 
-  createResultCard(star.name, players[0], players[1]).then((blob) => {
+  createResultCard(star.name, players[0], players[1], state.startingBudget, state.slotCount).then((blob) => {
     if (resultCardKey !== key) return;
     resultCardBlob = blob;
     resultCardPreviewUrl = URL.createObjectURL(blob);
@@ -1250,6 +1288,8 @@ async function shareResultCard() {
 }
 
 function renderAll() {
+  const tagline = document.getElementById("draft-settings-tagline");
+  if (tagline) tagline.textContent = `₹${state.startingBudget} Budget · ${state.slotCount} Movies Each`;
   renderHeroSelector();
   renderPlayerBoards();
   renderCenterStage();
@@ -1355,6 +1395,16 @@ function leaveRoom() {
 // EVENT LISTENERS & INITIALIZATION
 // ============================================================================
 function initEvents() {
+  document.getElementById("select-local-budget")?.addEventListener("change", (event) => {
+    if (party?.active) return;
+    state.startingBudget = Number(event.target.value);
+    startNewDraft(false);
+  });
+  document.getElementById("select-local-slots")?.addEventListener("change", (event) => {
+    if (party?.active) return;
+    state.slotCount = Number(event.target.value);
+    startNewDraft(false);
+  });
   document.getElementById("btn-sound-toggle")?.addEventListener("click", () => {
     state.soundEnabled = !state.soundEnabled;
     document.getElementById("sound-icon").textContent = state.soundEnabled ? "🔊" : "🔇";
@@ -1468,7 +1518,9 @@ function initEvents() {
     const roomCode = generateRoomCode();
 
     party.create({ code: roomCode, name, starId,
-      size: document.getElementById("select-create-players")?.value || "3", deckMode });
+      size: document.getElementById("select-create-players")?.value || "3", deckMode,
+      budget: document.getElementById("select-create-budget")?.value || "20",
+      slots: document.getElementById("select-create-slots")?.value || "5" });
   });
 
   // Submit Join Room
@@ -1542,13 +1594,40 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   const roomSize = document.getElementById("select-create-players");
   const deckSelect = document.getElementById("select-create-deck");
-  roomSize?.addEventListener("change", () => {
-    const groupRoom = Number(roomSize.value) > 2;
-    deckSelect.disabled = groupRoom;
-    deckSelect.value = groupRoom ? "extended-shuffled" : "video-exact";
-    document.getElementById("party-deck-note")?.classList.toggle("hidden", !groupRoom);
-  });
-  roomSize?.dispatchEvent(new Event("change"));
+  const starSelect = document.getElementById("select-create-star");
+  for (const category of ["Hero", "Heroine"]) {
+    const group = document.createElement("optgroup");
+    group.label = category === "Hero" ? "Heroes" : "Heroines";
+    for (const star of state.stars.filter((entry) => entry.category === category)) {
+      const option = document.createElement("option");
+      option.value = star.id;
+      option.textContent = `${star.name} (${star.movies.length} lead films)`;
+      group.appendChild(option);
+    }
+    starSelect.appendChild(group);
+  }
+  const updateCreateOptions = () => {
+    const size = Number(roomSize.value);
+    const slots = Number(document.getElementById("select-create-slots").value);
+    const star = state.stars.find((entry) => entry.id === starSelect.value);
+    const fullCatalog = size > 2 || slots > 5 || !star?.movies.some((movie) => movie.inVideoDraft);
+    deckSelect.disabled = fullCatalog;
+    deckSelect.value = fullCatalog ? "extended-shuffled" : "video-exact";
+    document.getElementById("party-deck-note")?.classList.toggle("hidden", !fullCatalog);
+    const note = document.getElementById("party-availability-note");
+    const needed = size * slots;
+    const available = star?.movies.length || 0;
+    note.textContent = available < slots
+      ? `${available} lead films available. Some films repeat to fill each lineup.`
+      : needed > available
+        ? `${available} lead films for ${needed} picks. Films may repeat across players.`
+        : `${available} lead films available for ${needed} picks.`;
+    document.getElementById("btn-submit-create-room").disabled = !available;
+  };
+  for (const control of [roomSize, starSelect, document.getElementById("select-create-slots")]) {
+    control?.addEventListener("change", updateCreateOptions);
+  }
+  updateCreateOptions();
   initEvents();
   startNewDraft(false);
   checkUrlParamsForRoom();

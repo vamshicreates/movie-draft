@@ -1,9 +1,10 @@
 import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
 import { createPartyResultCard } from "./shareCard.js";
 
-const HEROES = STARS_CATALOG.filter((star) => star.category === "Hero");
+const DRAFT_STARS = STARS_CATALOG.filter((star) => star.category === "Hero" || star.category === "Heroine");
 const REACTIONS = ["🔥", "💰", "🍿", "👏", "🏆", "🗣️ Teesko!"];
-const slotsPerPlayer = GAME_CONFIG.slotsPerPlayer;
+const slotCount = (room) => room?.slotCount || GAME_CONFIG.slotsPerPlayer;
+const startingBudget = (room) => room?.startingBudget || GAME_CONFIG.defaultBudget;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
@@ -21,7 +22,13 @@ function shuffle(items) {
 }
 
 function movieFor(room, id) {
-  return HEROES.find((star) => star.id === room?.starId)?.movies.find((movie) => movie.id === id);
+  return DRAFT_STARS.find((star) => star.id === room?.starId)?.movies.find((movie) => movie.id === id);
+}
+
+function canDraftMovie(player, movieId, room) {
+  return player.connected && player.slots.length < slotCount(room) &&
+    (DRAFT_STARS.find((star) => star.id === room.starId)?.movies.length < slotCount(room) ||
+      !player.slots.some((slot) => slot.movieId === movieId));
 }
 
 function roomLink(code) {
@@ -68,11 +75,17 @@ export class PartyRoom {
   get code() { return this.room?.code || null; }
   get player() { return this.room?.players.find((player) => player.role === this.role); }
 
-  create({ code, name, starId, size, deckMode }) {
+  create({ code, name, starId, size, deckMode, budget = 20, slots = 5 }) {
     if (typeof Peer === "undefined") return this.toast("Online service is still loading. Try again shortly.");
     this.leave(false);
     const count = Number(size);
     if (!Number.isInteger(count) || count < 2 || count > 5) return this.toast("Choose 2 to 5 players.");
+    const initialBudget = Number(budget);
+    const movieSlots = Number(slots);
+    if (!Number.isInteger(initialBudget) || initialBudget < 20 || initialBudget > 100 || initialBudget % 10 !== 0) return this.toast("Choose a budget from ₹20 to ₹100.");
+    if (!Number.isInteger(movieSlots) || movieSlots < 5 || movieSlots > 7) return this.toast("Choose 5 to 7 movies per player.");
+    const star = DRAFT_STARS.find((entry) => entry.id === starId);
+    if (!star?.movies.length) return this.toast("This star has no available films yet.");
     this.host = true;
     this.closing = false;
     this.role = "P1";
@@ -88,9 +101,10 @@ export class PartyRoom {
         return;
       }
       this.room = {
-        code, size: count, starId, deckMode: count > 2 ? "extended-shuffled" : deckMode,
+        code, size: count, starId, startingBudget: initialBudget, slotCount: movieSlots,
+        deckMode: count > 2 || movieSlots > 5 ? "extended-shuffled" : deckMode,
         phase: "lobby", players: [{ role: "P1", name: name.slice(0, 30), connected: true,
-          budget: GAME_CONFIG.defaultBudget, slots: [] }],
+          budget: initialBudget, slots: [] }],
         poolIds: [], index: 0, bid: 0, highBidder: null, passed: [], bidHistory: [], lastSale: "",
       };
       this.enter();
@@ -236,12 +250,12 @@ export class PartyRoom {
           !entry.connected && entry.role === data.roleHint && entry.name === name);
         if (!player && this.room?.phase === "lobby" && this.room.players.length < this.room.size) {
           player = { role: `P${this.room.players.length + 1}`, name, connected: true,
-            budget: GAME_CONFIG.defaultBudget, slots: [] };
+            budget: startingBudget(this.room), slots: [] };
           this.room.players.push(player);
         }
         if (!player && this.room?.phase === "lobby") {
           player = this.room.players.find((entry) => !entry.connected);
-          if (player) { player.name = name; player.slots = []; player.budget = GAME_CONFIG.defaultBudget; }
+          if (player) { player.name = name; player.slots = []; player.budget = startingBudget(this.room); }
         }
         if (!player) {
           conn.send({ type: "REJECTED", reason: this.room?.phase === "lobby"
@@ -344,11 +358,11 @@ export class PartyRoom {
     }
     clearTimeout(this.startTimer);
     this.startTimer = null;
-    const star = HEROES.find((entry) => entry.id === this.room.starId);
+    const star = DRAFT_STARS.find((entry) => entry.id === this.room.starId);
     const all = star.movies;
-    if (all.length < this.room.size * slotsPerPlayer) return this.toast("This hero needs more films for this room size.");
+    if (!all.length) return this.toast("This star has no available films yet.");
     const originals = all.filter((movie) => movie.inVideoDraft).sort((a, b) => a.videoOrder - b.videoOrder);
-    const useAll = this.room.size > 2 || this.room.deckMode === "extended-shuffled";
+    const useAll = this.room.size > 2 || slotCount(this.room) > 5 || this.room.deckMode === "extended-shuffled" || originals.length < slotCount(this.room) * 2;
     const pool = useAll ? shuffle(all) : this.room.deckMode === "video-shuffled" ? shuffle(originals) : originals;
     this.room.poolIds = pool.map((movie) => movie.id);
     this.room.phase = "draft";
@@ -360,7 +374,7 @@ export class PartyRoom {
     this.room.lastSale = "";
     this.resultBlob = null;
     this.resultKey = "";
-    for (const player of this.room.players) { player.budget = GAME_CONFIG.defaultBudget; player.slots = []; }
+    for (const player of this.room.players) { player.budget = startingBudget(this.room); player.slots = []; }
     this.publish();
   }
 
@@ -381,7 +395,8 @@ export class PartyRoom {
       this.publish();
       return;
     }
-    if (player.slots.length >= slotsPerPlayer) return;
+    const movieId = room.poolIds[room.index];
+    if (!movieId || !canDraftMovie(player, movieId, room)) return;
     if (action === "BID") {
       const next = room.bid + 1;
       const target = Number(amount) || next;
@@ -398,7 +413,7 @@ export class PartyRoom {
       this.publish();
     } else if (action === "CLAIM") {
       if (room.highBidder || room.passed.includes(role)) return;
-      if (room.players.some((other) => other.role !== role && other.connected && other.slots.length < slotsPerPlayer && other.budget > 0 && !room.passed.includes(other.role))) return;
+      if (room.players.some((other) => other.role !== role && canDraftMovie(other, movieId, room) && other.budget > 0 && !room.passed.includes(other.role))) return;
       this.award(role, 0);
       this.publish();
     }
@@ -407,13 +422,14 @@ export class PartyRoom {
   resolveIfReady() {
     const room = this.room;
     if (!room || room.phase !== "draft") return;
+    const movieId = room.poolIds[room.index];
     const othersCanBid = room.players.some((player) => player.connected &&
       player.role !== room.highBidder && !room.passed.includes(player.role) &&
-      player.slots.length < slotsPerPlayer && player.budget >= room.bid + 1);
+      canDraftMovie(player, movieId, room) && player.budget >= room.bid + 1);
     if (room.highBidder && !othersCanBid) {
       this.award(room.highBidder, room.bid);
     } else if (!room.highBidder && room.players.every((player) =>
-      player.slots.length >= slotsPerPlayer || room.passed.includes(player.role) || player.budget === 0)) {
+      !canDraftMovie(player, movieId, room) || room.passed.includes(player.role) || player.budget === 0)) {
       room.lastSale = "No bids · next film";
       this.nextMovie();
     }
@@ -423,7 +439,7 @@ export class PartyRoom {
     const room = this.room;
     const player = room.players.find((entry) => entry.role === role);
     const movieId = room.poolIds[room.index];
-    if (!player || !movieId || player.slots.length >= slotsPerPlayer) return;
+    if (!player || !movieId || !canDraftMovie(player, movieId, room)) return;
     player.budget -= price;
     player.slots.push({ movieId, price });
     room.lastSale = `${player.name} won ${movieFor(room, movieId)?.title || "the film"} for ${price ? `₹${price}` : "free"}`;
@@ -432,21 +448,19 @@ export class PartyRoom {
 
   nextMovie() {
     const room = this.room;
-    if (room.players.every((player) => player.slots.length >= slotsPerPlayer)) {
+    if (room.players.every((player) => player.slots.length >= slotCount(room))) {
       room.phase = "complete";
       return;
     }
-    room.index += 1;
+    const allIds = DRAFT_STARS.find((star) => star.id === room.starId).movies.map((movie) => movie.id);
+    do {
+      room.index += 1;
+      if (room.index >= room.poolIds.length) room.poolIds.push(...shuffle(allIds));
+    } while (!room.players.some((player) => canDraftMovie(player, room.poolIds[room.index], room)));
     room.bid = 0;
     room.highBidder = null;
     room.passed = [];
     room.bidHistory = [];
-    if (room.index >= room.poolIds.length) {
-      const drafted = new Set(room.players.flatMap((player) => player.slots.map((slot) => slot.movieId)));
-      const unsold = room.poolIds.filter((id) => !drafted.has(id));
-      if (unsold.length) room.poolIds.push(...shuffle(unsold));
-      else room.phase = "complete";
-    }
   }
 
   broadcastReaction(emoji) {
@@ -493,21 +507,23 @@ export class PartyRoom {
   render() {
     const room = this.room;
     if (!room || !this.arena) return;
-    const star = HEROES.find((entry) => entry.id === room.starId);
+    const star = DRAFT_STARS.find((entry) => entry.id === room.starId);
+    const picks = slotCount(room);
+    const budget = startingBudget(room);
     const joined = room.players.filter((player) => player.connected).length;
     const playerCards = Array.from({ length: room.size }, (_, index) => {
       const player = room.players[index];
       const mine = player?.role === this.role;
       const slots = player?.slots || [];
       return `<article class="party-player ${mine ? "mine" : ""} ${!player?.connected ? "pending" : ""}">
-        <div class="party-player-head"><span class="party-role">P${index + 1}${mine ? " · YOU" : ""}</span><strong>${escapeHtml(player?.name || "Waiting…")}</strong><span class="party-budget">₹${player?.budget ?? 20}</span></div>
-        <div class="party-player-progress"><span style="width:${slots.length * 20}%"></span></div>
-        <div class="party-picks">${Array.from({ length: slotsPerPlayer }, (_, slotIndex) => {
+        <div class="party-player-head"><span class="party-role">P${index + 1}${mine ? " · YOU" : ""}</span><strong>${escapeHtml(player?.name || "Waiting…")}</strong><span class="party-budget">₹${player?.budget ?? budget}</span></div>
+        <div class="party-player-progress"><span style="width:${slots.length / picks * 100}%"></span></div>
+        <div class="party-picks">${Array.from({ length: picks }, (_, slotIndex) => {
           const slot = slots[slotIndex];
           const movie = slot && movieFor(room, slot.movieId);
           return movie ? `<span class="party-pick" title="Won for ₹${slot.price}"><img src="${movie.poster}" alt="" /><span>${escapeHtml(movie.shortTitle || movie.title)}</span></span>` : `<span class="party-pick party-empty">${slotIndex + 1}</span>`;
         }).join("")}</div>
-        <span class="party-slot-count">${slots.length}/${slotsPerPlayer} films</span>
+        <span class="party-slot-count">${slots.length}/${picks} films</span>
       </article>`;
     }).join("");
 
@@ -520,7 +536,7 @@ export class PartyRoom {
       }).join("");
       center = `<section class="party-wait"><span class="party-big-icon">${room.phase === "paused" ? "⏸" : "🎬"}</span>
         <h2>${room.phase === "paused" ? "Waiting for a player to reconnect" : `Your ${room.size}-player room is ready`}</h2>
-        <p>${joined}/${room.size} players connected · ${escapeHtml(star.name)} movies · 5 picks each</p>
+        <p>${joined}/${room.size} players connected · ${escapeHtml(star.name)} movies · ${picks} picks each · ₹${budget} budget</p>
         <ol class="party-lobby-players">${roster}</ol>
         <p class="party-lobby-status">${room.phase === "paused" ? "The draft resumes when everyone reconnects." : waiting ? `Waiting for ${waiting} more ${waiting === 1 ? "player" : "players"}…` : "Everyone is here. Starting the movie draft…"}</p>
         <strong class="party-code">${escapeHtml(room.code)}</strong>
@@ -530,19 +546,20 @@ export class PartyRoom {
     } else if (room.phase === "draft") {
       const movie = movieFor(room, room.poolIds[room.index]);
       const me = this.player;
-      const canBid = me && me.connected && me.slots.length < slotsPerPlayer &&
+      const eligible = me && canDraftMovie(me, room.poolIds[room.index], room);
+      const canBid = eligible &&
         !room.passed.includes(this.role) && room.highBidder !== this.role && me.budget >= room.bid + 1;
-      const canPass = me && me.slots.length < slotsPerPlayer &&
+      const canPass = eligible &&
         !room.passed.includes(this.role) && room.highBidder !== this.role;
-      const freeClaim = me && me.slots.length < slotsPerPlayer && !room.highBidder &&
-        room.players.every((player) => player.role === this.role || player.slots.length >= slotsPerPlayer || player.budget === 0 || room.passed.includes(player.role));
+      const freeClaim = eligible && !room.highBidder &&
+        room.players.every((player) => player.role === this.role || !canDraftMovie(player, room.poolIds[room.index], room) || player.budget === 0 || room.passed.includes(player.role));
       center = `<section class="party-stage"><div class="party-round"><strong>${escapeHtml(star.name)}'s Movies Draft</strong><span>FILM ${room.index + 1} / ${room.poolIds.length}</span></div>
         <div class="party-showcase"><div class="party-poster"><img src="${movie?.poster || ""}" alt="${escapeHtml(movie?.title || "Film")} poster" /><h2>${escapeHtml(movie?.title || "Film")}</h2></div>
           <div class="party-bidding"><span class="party-live-label">🔴 LIVE BIDDING</span>
             <div class="party-high">${room.highBidder ? `<strong>₹${room.bid}</strong><span>${escapeHtml(room.players.find((player) => player.role === room.highBidder)?.name)} leads</span>` : `<strong>₹1</strong><span>Opening bid</span>`}</div>
             <div class="party-bid-trail">${room.bidHistory.length ? room.bidHistory.map((bid) => `<span>${bid.role} ₹${bid.amount}</span>`).join("") : "Be first to bid"}</div>
             <div class="party-controls"><button class="nf-btn-red" data-party="bid" ${canBid ? "" : "disabled"}>Bid ₹${room.bid + 1}</button><button class="nf-btn-plus" data-party="bid2" ${canBid && me.budget >= room.bid + 2 ? "" : "disabled"}>+₹2</button><button class="nf-btn-teesko" data-party="pass" ${canPass ? "" : "disabled"}>Teesko! Pass</button>${freeClaim ? `<button class="nf-btn-red" data-party="claim">Claim free</button>` : ""}</div>
-            <p class="party-bid-help">${room.passed.includes(this.role) ? "You passed on this film." : room.highBidder === this.role ? "Your bid leads. Wait for the others." : `${escapeHtml(me?.name || "Your player")}, you have ₹${me?.budget ?? 0} left.`}</p>
+            <p class="party-bid-help">${!eligible ? "You already drafted this film or filled your lineup." : room.passed.includes(this.role) ? "You passed on this film." : room.highBidder === this.role ? "Your bid leads. Wait for the others." : `${escapeHtml(me?.name || "Your player")}, you have ₹${me?.budget ?? 0} left.`}</p>
             ${this.host ? `<button class="skip-link" data-party="skip">Skip film</button>` : ""}
           </div></div></section>`;
     } else {
@@ -588,7 +605,7 @@ export class PartyRoom {
   }
 
   caption() {
-    const star = HEROES.find((entry) => entry.id === this.room.starId);
+    const star = DRAFT_STARS.find((entry) => entry.id === this.room.starId);
     return `🎬 ${star.name}'s Movie Draft\n${this.room.players.map((player) => `${player.role} ${player.name}: ${player.slots.map((slot) => movieFor(this.room, slot.movieId)?.title).join(", ")}`).join("\n")}\n\nWho drafted better? Comment ${this.room.players.map((player) => player.role).join(" / ")} 👇\n${location.origin}`;
   }
 
@@ -598,8 +615,8 @@ export class PartyRoom {
     this.resultKey = key;
     this.resultBlob = null;
     try {
-      const star = HEROES.find((entry) => entry.id === this.room.starId);
-      const blob = await createPartyResultCard(star.name, this.resultPlayers());
+      const star = DRAFT_STARS.find((entry) => entry.id === this.room.starId);
+      const blob = await createPartyResultCard(star.name, this.resultPlayers(), startingBudget(this.room), slotCount(this.room));
       if (this.resultKey !== key) return;
       this.resultBlob = blob;
       this.render();

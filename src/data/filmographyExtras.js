@@ -1,7 +1,6 @@
-// Released acting credits checked against the four actor filmography pages below.
-// Includes brief appearances, childhood roles, and the released Baahubali recut
-// so every five-player draft has at least 25 distinct titles. Unreleased films
-// and producer-only credits are excluded.
+// Released lead and co-lead acting credits checked against the filmography pages below.
+// Cameos, child roles, voice-only work, supporting roles, recuts, short films,
+// unreleased films, and producer-only credits are excluded.
 // https://en.wikipedia.org/wiki/Nani_filmography
 // https://en.wikipedia.org/wiki/Allu_Arjun_filmography
 // https://en.wikipedia.org/wiki/Prabhas_filmography
@@ -13,39 +12,29 @@ const credits = {
   nani: [
     ["Ride", 2009], ["Snehituda", 2009], ["Bheemili Kabaddi Jattu", 2010],
     ["Veppam", 2011], ["Yeto Vellipoyindhi Manasu", 2012],
-    ["Neethaane En Ponvasantham", 2012], ["Paisa", 2014],
-    ["Aaha Kalyanam", 2014], ["Nimirndhu Nil", 2014],
-    ["Janda Pai Kapiraju", 2015], ["Dongaata", 2015],
-    ["Superstar Kidnap", 2015], ["Krishna Gaadi Veera Prema Gaadha", 2016],
-    ["Majnu", 2016], ["Jyo Achyutananda", 2016],
+    ["Paisa", 2014], ["Aaha Kalyanam", 2014],
+    ["Janda Pai Kapiraju", 2015],
+    ["Krishna Gaadi Veera Prema Gaadha", 2016], ["Majnu", 2016],
     ["Middle Class Abbayi", 2017], ["Krishnarjuna Yudham", 2018],
-    ["Devadas", 2018], ["Neevevaro", 2018], ["V", 2020],
-    ["Tuck Jagadish", 2021], ["HIT: The Second Case", 2022],
-    ["HIT: The Third Case", 2025], ["The Paradise", 2026],
+    ["Devadas", 2018], ["V", 2020],
+    ["Tuck Jagadish", 2021],
+    ["HIT: The Third Case", 2025],
   ],
   "allu-arjun": [
-    ["Vijetha", 1985], ["Swathi Muthyam", 1986], ["Daddy", 2001],
     ["Gangotri", 2003], ["Bunny", 2005], ["Happy", 2006],
-    ["Shankar Dada Zindabad", 2007], ["Arya 2", 2009],
+    ["Arya 2", 2009],
     ["Varudu", 2010], ["Badrinath", 2011], ["Iddarammayilatho", 2013],
-    ["I Am That Change", 2014], ["Yevadu", 2014],
-    ["Rudhramadevi", 2015], ["DJ: Duvvada Jagannadham", 2017],
+    ["DJ: Duvvada Jagannadham", 2017],
     ["Naa Peru Surya", 2018], ["Pushpa 2: The Rule", 2024],
   ],
   prabhas: [
     ["Eeswar", 2002], ["Raghavendra", 2003], ["Adavi Ramudu", 2004],
     ["Chakram", 2005], ["Pournami", 2006], ["Yogi", 2007],
     ["Munna", 2007], ["Bujjigadu", 2008], ["Ek Niranjan", 2009],
-    ["Rebel", 2012], ["Denikaina Ready", 2012],
-    ["Action Jackson", 2014], ["Saaho", 2019], ["Radhe Shyam", 2022],
-    ["Adipurush", 2023], ["Kannappa", 2025], ["Mirai", 2025],
-    ["Baahubali: The Epic", 2025], ["The RajaSaab", 2026],
+    ["Rebel", 2012], ["Saaho", 2019], ["Radhe Shyam", 2022],
+    ["Adipurush", 2023], ["The RajaSaab", 2026],
   ],
   "mahesh-babu": [
-    ["Needa", 1979], ["Poratam", 1983], ["Sankharavam", 1987],
-    ["Bazaar Rowdy", 1988], ["Mugguru Kodukulu", 1988],
-    ["Gudachari 117", 1989], ["Koduku Diddina Kapuram", 1989],
-    ["Anna Thammudu", 1990], ["Balachandrudu", 1990],
     ["Rajakumarudu", 1999], ["Yuvaraju", 2000], ["Vamsi", 2000],
     ["Takkari Donga", 2002], ["Bobby", 2002], ["Nijam", 2003],
     ["Naani", 2004], ["Arjun", 2004], ["Sainikudu", 2006],
@@ -60,7 +49,7 @@ function slug(value) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function textPoster(title, year) {
+export function textPoster(title, year) {
   const safe = title.replace(/[<>&"']/g, "");
   const lines = safe.match(/.{1,18}(?:\s|$)/g)?.slice(0, 4) || [safe];
   const labels = lines.map((line, index) => `<text x="200" y="${244 + index * 42}" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="29" font-weight="bold">${line.trim()}</text>`).join("");

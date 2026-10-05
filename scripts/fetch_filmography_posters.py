@@ -1,13 +1,14 @@
-"""Fetch poster files for new filmography entries from Wikipedia file pages.
+"""Fetch available movie poster files for the curated actor catalogs.
 
 Usage: python3 scripts/fetch_filmography_posters.py
 The script writes local images and a JS path manifest. Failed lookups retain the
-app's generated title card; it never substitutes an unrelated photograph.
+app's generated title card; it never substitutes an unrelated photograph. It
+requests one film at a time and stops if Wikimedia responds with a rate limit.
 """
 
-import concurrent.futures
 import json
 import re
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -15,7 +16,6 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXTRAS = ROOT / "src/data/filmographyExtras.js"
 DEST = ROOT / "public/posters/filmography"
 MANIFEST = ROOT / "src/data/filmoPosterPaths.js"
 API = "https://en.wikipedia.org/w/api.php"
@@ -26,12 +26,19 @@ def request_json(params):
     url = API + "?" + urllib.parse.urlencode(params)
     for attempt in range(3):
         try:
+            time.sleep(0.45)
             with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=15) as response:
                 return json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code == 429:
+                raise
+            if attempt == 2:
+                raise
+            time.sleep(attempt + 1)
         except (urllib.error.URLError, TimeoutError):
             if attempt == 2:
                 raise
-            time.sleep(0.5 * (attempt + 1))
+            time.sleep(attempt + 1)
 
 
 def slug(value):
@@ -40,16 +47,6 @@ def slug(value):
 
 def normalize(value):
     return set(re.findall(r"[a-z0-9]+", value.lower())) - {"the", "a", "an", "film", "movie"}
-
-
-def page_images(title):
-    result = request_json({"action": "query", "prop": "images", "titles": title,
-                           "format": "json", "imlimit": 50})
-    pages = result.get("query", {}).get("pages", {})
-    page = next(iter(pages.values())) if pages else {}
-    if "missing" in page:
-        return []
-    return [entry["title"] for entry in page.get("images", [])]
 
 
 def best_image(images, title):
@@ -72,10 +69,30 @@ def best_image(images, title):
 
 def find_image(title, year):
     # Exact film page first; year and film suffixes cover common disambiguations.
-    candidates = [f"{title} ({year} film)", f"{title} (film)", title,
+    alternate_pages = {
+        "Geetanjali": "Geethanjali (1989 film)",
+        "Siva": "Shiva (1989 Telugu film)",
+        "Swarna Kamalam": "Swarnakamalam",
+        "Student No. 1": "Student No: 1",
+        "Aadi": "Aadhi (2002 film)",
+        "Shiva Manasulo Shruti": "Siva Manasulo Sruthi",
+        "Appatlo Okadundevaadu": "Appatlo Okadundevadu",
+        "Life Before Wedding": "LBW (Life Before Wedding)",
+        "Leo": "Leo (2023 Indian film)",
+        "Beast": "Beast (2022 Indian film)",
+        "Utsavam": "Utsavam (2024 film)",
+        "Aankh Micholi": "Aankh Micholi (2023 film)",
+        "Love Me": "Love Me (2024 Indian film)",
+    }
+    candidates = [alternate_pages[title]] if title in alternate_pages else []
+    candidates += [f"{title} ({year} film)", f"{title} (film)", title,
                   f"{title} (Telugu film)", f"{title} (Indian film)"]
-    for page in candidates:
-        image = best_image(page_images(page), title)
+    result = request_json({"action": "query", "prop": "images", "titles": "|".join(candidates),
+                           "format": "json", "imlimit": 50})
+    pages = {page.get("title"): page for page in result.get("query", {}).get("pages", {}).values()}
+    for candidate in candidates:
+        page = pages.get(candidate, {})
+        image = best_image([entry["title"] for entry in page.get("images", [])], alternate_pages.get(title, title))
         if image:
             return image
     return None
@@ -90,8 +107,7 @@ def image_url(file_title):
 
 
 def fetch_one(entry):
-    hero, title, year = entry
-    movie_id = f"{hero}-{slug(title)}"
+    hero, title, year, movie_id = entry
     try:
         file_title = find_image(title, year)
         if not file_title:
@@ -105,6 +121,7 @@ def fetch_one(entry):
             return movie_id, None, "unsupported format"
         target = DEST / hero / f"{slug(title)}{suffix}"
         target.parent.mkdir(parents=True, exist_ok=True)
+        time.sleep(0.45)
         with urllib.request.urlopen(urllib.request.Request(url, headers=HEADERS), timeout=20) as response:
             target.write_bytes(response.read(3_000_001))
         if target.stat().st_size > 3_000_000:
@@ -117,34 +134,29 @@ def fetch_one(entry):
 
 
 def parse_entries():
-    content = EXTRAS.read_text()
-    entries = []
-    for hero, body in re.findall(r'\n  (nani|"allu-arjun"|prabhas|"mahesh-babu"): \[(.*?)\n  \],', content, re.S):
-        for title, year in re.findall(r'\["([^"]+)", (\d{4})\]', body):
-            entries.append((hero.strip('"'), title, int(year)))
-    return entries
+    script = "import { STARS_CATALOG } from './src/data/moviesData.js'; const lists = STARS_CATALOG.map(s => s.movies.filter(m => m.poster.startsWith('data:')).map(m => [s.id, m.title, m.year, m.id])); console.log(JSON.stringify(Array.from({length: Math.max(...lists.map(a => a.length))}, (_, i) => lists.map(a => a[i]).filter(Boolean)).flat()))"
+    output = subprocess.check_output(["node", "--input-type=module", "-e", script], cwd=ROOT, text=True)
+    return json.loads(output)
 
 
 def main():
     entries = parse_entries()
     existing = dict(re.findall(r'"([^"]+)": "([^"]+)"', MANIFEST.read_text())) if MANIFEST.exists() else {}
-    manifest = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-        missing = [entry for entry in entries if not (
-            existing.get(f"{entry[0]}-{slug(entry[1])}") and
-            (ROOT / "public" / existing[f"{entry[0]}-{slug(entry[1])}"].lstrip("/")).exists()
-        )]
-        for entry in entries:
-            movie_id = f"{entry[0]}-{slug(entry[1])}"
-            path = existing.get(movie_id)
-            if path and (ROOT / "public" / path.lstrip("/")).exists():
-                manifest[movie_id] = path
-        for movie_id, path, note in pool.map(fetch_one, missing):
-            print(f"{movie_id}: {path or '-'} ({note})", flush=True)
-            if path:
-                manifest[movie_id] = path
-    MANIFEST.write_text("// Local Wikipedia poster images fetched by scripts/fetch_filmography_posters.py\n"
-                        + "export const posterPaths = " + json.dumps(manifest, indent=2, ensure_ascii=False) + ";\n")
+    manifest = dict(existing)
+    missing = [entry for entry in entries if not (
+        existing.get(entry[3]) and
+        (ROOT / "public" / existing[entry[3]].lstrip("/")).exists()
+    )]
+    for entry in missing:
+        movie_id, path, note = fetch_one(entry)
+        print(f"{movie_id}: {path or '-'} ({note})", flush=True)
+        if path:
+            manifest[movie_id] = path
+            MANIFEST.write_text("// Local Wikipedia poster images fetched by scripts/fetch_filmography_posters.py\n"
+                                + "export const posterPaths = " + json.dumps(manifest, indent=2, ensure_ascii=False) + ";\n")
+        if "429" in note:
+            print("Rate limited by Wikipedia; stopping poster downloads.", flush=True)
+            break
     print(f"Saved {len(manifest)} of {len(entries)} posters")
 
 

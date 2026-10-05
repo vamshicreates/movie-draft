@@ -1,6 +1,6 @@
 # 🎬 Movie Draft & Auction
 
-A live **Movie Draft & Auction Game** inspired by Telugu cinema. Draft five-film lineups for **Nani**, **Allu Arjun**, **Prabhas**, and **Mahesh Babu** with bidding, the *"Teesko!"* pass rule, live emoji reactions, and online rooms across devices.
+A live **Movie Draft & Auction Game** inspired by Telugu cinema. Draft lineups from 22 heroes and 21 heroines with bidding, the *"Teesko!"* pass rule, live emoji reactions, and online rooms across devices.
 
 ![Movie Draft Preview](public/posters/nani/jersey.jpg)
 
@@ -12,15 +12,15 @@ A live **Movie Draft & Auction Game** inspired by Telugu cinema. Draft five-film
 - ⚡ **WebRTC rooms**: PeerJS DataChannels connect players on Vercel and during local development. The host needs to keep their browser tab open for the room to stay available.
 - 📱 **Mobile & touch layout**: Online rooms put the film poster and your bidding paddle in focus, with a scrollable lineup strip on small screens.
 - 🍿 **Authentic Auction Mechanics**:
-  - ₹20 budget per player to draft 5 movies.
+  - Choose a ₹20–₹100 starting budget and 5–7 movies per player (defaults: ₹20 and 5).
   - Bid increments (+₹1, +₹2) with authentic sound effects.
   - *"Teesko!"* pass rule to award the film to the high bidder.
-  - Auto-claim rules when opponent is full (5/5) or bankrupt (₹0).
+  - Auto-claim rules when an opponent is full or bankrupt (₹0).
 - 🤖 **vs AI Mode**: Play solo against an intelligent AI drafter.
-- 🎬 **Expanded film catalogs**: **Nani** (40 films), **Allu Arjun** (27 films), **Prabhas** (29 films), and **Mahesh Babu** (37 films), including released early roles and cameos. Local poster files are used where available; a title card fills the remaining gap.
+- 🎬 **43 actor catalogs**: Released lead and substantial co-lead films only. Movies can recur across players when a room needs more picks than the catalog contains. For actors with fewer films than the chosen slot count, films can repeat within a lineup. Local poster files are used where available; a title card fills the remaining gap.
 - 🏆 **Shareable results**: Export a portrait image of all lineups for Instagram and ask friends to comment which player drafted best.
 
-The added film credits were checked against [Nani's](https://en.wikipedia.org/wiki/Nani_filmography), [Allu Arjun's](https://en.wikipedia.org/wiki/Allu_Arjun_filmography), [Prabhas's](https://en.wikipedia.org/wiki/Prabhas_filmography), and [Mahesh Babu's](https://en.wikipedia.org/wiki/Mahesh_Babu_filmography) published filmographies. Unreleased films and producer-only credits are excluded. Some minor and childhood acting appearances are included so a five-player room has enough distinct films. Added poster images were fetched from the corresponding Wikipedia file pages with `scripts/fetch_filmography_posters.py`.
+The added film credits were checked against published actor filmographies, including [Nani's](https://en.wikipedia.org/wiki/Nani_filmography), [Allu Arjun's](https://en.wikipedia.org/wiki/Allu_Arjun_filmography), [Samantha Ruth Prabhu's](https://en.wikipedia.org/wiki/Samantha_Ruth_Prabhu_filmography), and [Nagarjuna's](https://en.wikipedia.org/wiki/Nagarjuna_filmography). Cameos, child roles, voice-only work, and unreleased films are excluded. Added poster images were fetched from the corresponding Wikipedia file pages with `scripts/fetch_filmography_posters.py`.
 
 ---
 
