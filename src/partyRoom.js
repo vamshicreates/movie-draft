@@ -558,9 +558,8 @@ export class PartyRoom {
           <div class="party-bidding"><span class="party-live-label">🔴 LIVE BIDDING</span>
             <div class="party-high">${room.highBidder ? `<strong>₹${room.bid}</strong><span>${escapeHtml(room.players.find((player) => player.role === room.highBidder)?.name)} leads</span>` : `<strong>₹1</strong><span>Opening bid</span>`}</div>
             <div class="party-bid-trail">${room.bidHistory.length ? room.bidHistory.map((bid) => `<span>${bid.role} ₹${bid.amount}</span>`).join("") : "Be first to bid"}</div>
-            <div class="party-controls"><button class="nf-btn-red" data-party="bid" ${canBid ? "" : "disabled"}>Bid ₹${room.bid + 1}</button><button class="nf-btn-plus" data-party="bid2" ${canBid && me.budget >= room.bid + 2 ? "" : "disabled"}>+₹2</button><button class="nf-btn-teesko" data-party="pass" ${canPass ? "" : "disabled"}>Teesko! Pass</button>${freeClaim ? `<button class="nf-btn-red" data-party="claim">Claim free</button>` : ""}</div>
+            <div class="party-controls"><button class="nf-btn-red" data-party="bid" ${canBid ? "" : "disabled"}>Bid ₹${room.bid + 1}</button><button class="nf-btn-plus" data-party="bid2" ${canBid && me.budget >= room.bid + 2 ? "" : "disabled"}>+₹2</button><button class="nf-btn-teesko" data-party="pass" ${canPass ? "" : "disabled"}>Teesko! Pass</button><button class="nf-btn-skip" data-party="skip" ${this.host ? "" : "disabled"}>${this.host ? "Skip film" : "Skip (host)"}</button>${freeClaim ? `<button class="nf-btn-red" data-party="claim">Claim free</button>` : ""}</div>
             <p class="party-bid-help">${!eligible ? "You already drafted this film or filled your lineup." : room.passed.includes(this.role) ? "You passed on this film." : room.highBidder === this.role ? "Your bid leads. Wait for the others." : `${escapeHtml(me?.name || "Your player")}, you have ₹${me?.budget ?? 0} left.`}</p>
-            ${this.host ? `<button class="skip-link" data-party="skip">Skip film</button>` : ""}
           </div></div></section>`;
     } else {
       const labels = room.players.map((player) => player.role).join(" / ");

@@ -784,17 +784,21 @@ kbd {
   color: var(--nf-white);
 }
 
-.skip-link {
-  background: transparent;
-  border: none;
-  color: var(--nf-muted);
-  font-size: 0.76rem;
-  text-decoration: underline;
+.nf-btn-skip {
+  background: #262626;
+  border: 1px solid var(--nf-border-bright);
+  border-radius: 8px;
+  color: var(--nf-white);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 800;
+  min-height: 46px;
+  padding: 0.5rem 0.8rem;
   cursor: pointer;
 }
 
-.skip-link:hover {
-  color: var(--nf-white);
+.nf-btn-skip:hover:not(:disabled) {
+  background: #383838;
 }
 
 /* Sold Stamp Overlay */
@@ -1024,7 +1028,7 @@ kbd {
 
 .nf-select:disabled,
 .nf-btn-ghost:disabled,
-.skip-link:disabled {
+.nf-btn-skip:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1621,12 +1625,13 @@ kbd {
 .party-high span { color: var(--nf-silver); font-size: .85rem; }
 .party-bid-trail { display: flex; flex-wrap: wrap; gap: .3rem; min-height: 40px; color: var(--nf-muted); font-size: .76rem; align-content: center; }
 .party-bid-trail span { border-radius: 99px; background: #2b2b2b; color: #fff; padding: .25rem .5rem; font: 700 .68rem var(--font-mono); }
-.party-controls { display: grid; grid-template-columns: 1fr auto; gap: .45rem; }
+.party-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(94px, auto); gap: .45rem; }
 .party-controls button { min-height: 46px; }
-.party-controls .nf-btn-teesko { grid-column: 1 / -1; }
+.party-controls .nf-btn-teesko { grid-column: 1; }
+.party-controls .nf-btn-skip { grid-column: 2; }
+.party-controls [data-party="claim"] { grid-column: 1 / -1; }
 .party-controls button:disabled { opacity: .45; cursor: not-allowed; }
 .party-bid-help { color: var(--nf-silver); font-size: .75rem; }
-.party-bidding .skip-link { align-self: flex-end; }
 .party-reactions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .45rem; margin-top: .8rem; }
 .party-reactions > span { color: var(--nf-muted); font-size: .78rem; margin-right: .3rem; }
 .party-last-sale { text-align: center; color: var(--nf-silver); font-size: .78rem; min-height: 1.2rem; margin-top: .5rem; }
@@ -1686,8 +1691,6 @@ kbd {
   .party-high { flex-direction: row; gap: .6rem; align-items: baseline; }
   .party-high strong { font-size: 2rem; }
   .party-bid-trail { min-height: 24px; }
-  .party-controls { grid-template-columns: 1fr auto 1fr; }
-  .party-controls .nf-btn-teesko { grid-column: auto; }
   .party-controls button { font-size: .75rem; min-height: 48px; padding: .35rem; }
   .party-reactions { gap: .3rem; }
   .party-reactions > span { flex-basis: 100%; text-align: center; }
