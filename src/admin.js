@@ -46,6 +46,7 @@ function preview(src, type, title, copy, cta) {
   if (!src) { box.textContent = "Your ad preview appears here after you choose media."; return; }
   const card = document.createElement("article");
   card.className = "sponsor-card";
+  if (type === "video/mp4") card.classList.add("sponsor-card-video");
   const media = document.createElement("span");
   media.className = "sponsor-media";
   const element = document.createElement(type === "video/mp4" ? "video" : "img");

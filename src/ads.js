@@ -11,6 +11,7 @@ function safeUrl(value) {
 function createCard(ad) {
   const card = document.createElement("article");
   card.className = "sponsor-card";
+  if (ad.mediaType === "video/mp4") card.classList.add("sponsor-card-video");
   card.dataset.adId = ad.id;
   card.dataset.placement = ad.placement;
 
