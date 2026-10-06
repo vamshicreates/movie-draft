@@ -1,5 +1,6 @@
 import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
 import { createPartyResultCard } from "./shareCard.js";
+import { detachAds, hydrateAds } from "./ads.js";
 
 const DRAFT_STARS = STARS_CATALOG.filter((star) => star.category === "Hero" || star.category === "Heroine");
 const REACTIONS = ["🔥", "💰", "🍿", "👏", "🏆", "🗣️ Teesko!"];
@@ -568,8 +569,11 @@ export class PartyRoom {
         <div class="party-result-actions"><button class="nf-btn-red" data-party="share" ${this.resultBlob ? "" : "disabled"}>Share result</button><button class="nf-btn-ghost" data-party="download" ${this.resultBlob ? "" : "disabled"}>Download image</button><button class="nf-btn-ghost" data-party="caption">Copy caption</button>${this.host ? `<button class="nf-btn-red" data-party="again">Play Again</button>` : ""}</div>
         <small>${this.resultBlob ? "Image ready to share." : "Preparing the result image…"}</small></section>`;
     }
+    detachAds(this.arena);
     this.arena.innerHTML = `<div class="party-room-strip"><div><span class="room-live-pill">🔴 LIVE ROOM</span><strong>${escapeHtml(room.code)}</strong><span>${joined}/${room.size} players</span></div><div><button class="nf-btn-ghost-sm" data-party="copy">Copy link</button><button class="nf-btn-ghost-sm" data-party="leave">Leave</button></div></div>
-      <div class="party-layout"><div class="party-main">${center}<div class="party-reactions"><span>Quick Reactions:</span>${REACTIONS.map((emoji) => `<button class="btn-react" data-party="react" data-emoji="${escapeHtml(emoji)}">${emoji === "🗣️ Teesko!" ? "Teesko!" : emoji}</button>`).join("")}</div><p class="party-last-sale">${escapeHtml(room.lastSale || "")}</p></div><aside class="party-sidebar"><h3>Lineups</h3><div class="party-scoreboard">${playerCards}</div></aside></div>`;
+      ${room.phase === "lobby" ? '<div class="ad-slot ad-slot-waiting" data-ad-slot="waiting" hidden></div>' : ""}
+      <div class="party-layout ${room.phase === "complete" ? "party-layout-complete" : ""}"><div class="party-main">${center}<div class="party-reactions"><span>Quick Reactions:</span>${REACTIONS.map((emoji) => `<button class="btn-react" data-party="react" data-emoji="${escapeHtml(emoji)}">${emoji === "🗣️ Teesko!" ? "Teesko!" : emoji}</button>`).join("")}</div>${room.phase === "draft" ? '<div class="ad-slot ad-slot-live" data-ad-slot="live" hidden></div>' : ""}<p class="party-last-sale">${escapeHtml(room.lastSale || "")}</p></div><aside class="party-sidebar"><h3>Lineups</h3><div class="party-scoreboard">${playerCards}</div>${room.phase === "complete" ? '<div class="ad-slot ad-slot-results" data-ad-slot="results" hidden></div>' : ""}</aside></div>`;
+    hydrateAds(this.arena);
     document.getElementById("mp-btn-label").textContent = `Room: ${room.code} · ${this.role}`;
     document.getElementById("mp-status-dot")?.classList.toggle("connected", joined === room.size);
     this.renderModal();

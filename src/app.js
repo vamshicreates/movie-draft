@@ -1,6 +1,7 @@
 import { GAME_CONFIG, STARS_CATALOG } from "./data/moviesData.js";
 import { createResultCard } from "./shareCard.js";
 import { PartyRoom } from "./partyRoom.js";
+import { hydrateAds } from "./ads.js";
 
 const DRAFT_STARS = STARS_CATALOG.filter((star) => star.category === "Hero" || star.category === "Heroine");
 
@@ -1293,6 +1294,10 @@ function renderAll() {
   renderHeroSelector();
   renderPlayerBoards();
   renderCenterStage();
+  const beforeFirstBid = state.currentIndex === 0 && state.currentBid === 0 && !state.draftFinished;
+  document.getElementById("home-ad-region")?.classList.toggle("hidden", Boolean(party?.active) || !beforeFirstBid);
+  document.querySelector('.nf-arena [data-ad-slot="live"]')?.classList.toggle("hidden", beforeFirstBid);
+  hydrateAds();
 }
 
 // ============================================================================

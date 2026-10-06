@@ -19,6 +19,7 @@ A live **Movie Draft & Auction Game** inspired by Telugu cinema. Draft lineups f
 - 🤖 **vs AI Mode**: Play solo against an intelligent AI drafter.
 - 🎬 **43 actor catalogs**: Released lead and substantial co-lead films only. Movies can recur across players when a room needs more picks than the catalog contains. For actors with fewer films than the chosen slot count, films can repeat within a lineup. Local poster files are used where available; a title card fills the remaining gap.
 - 🏆 **Shareable results**: Export a portrait image of all lineups for Instagram and ask friends to comment which player drafted best.
+- 📣 **Sponsored placements**: Optional home, live draft, waiting room, and results cards. The separate ad manager accepts JPG, PNG, WebP, GIF, or MP4 media, with a strict 10-second MP4 limit. Ads are labeled Sponsored and do not cover the movie poster or bidding controls.
 
 The added film credits were checked against published actor filmographies, including [Nani's](https://en.wikipedia.org/wiki/Nani_filmography), [Allu Arjun's](https://en.wikipedia.org/wiki/Allu_Arjun_filmography), [Samantha Ruth Prabhu's](https://en.wikipedia.org/wiki/Samantha_Ruth_Prabhu_filmography), and [Nagarjuna's](https://en.wikipedia.org/wiki/Nagarjuna_filmography). Cameos, child roles, voice-only work, and unreleased films are excluded. Added poster images were fetched from the corresponding Wikipedia file pages with `scripts/fetch_filmography_posters.py`.
 
@@ -61,6 +62,14 @@ npx vercel
 
 Vercel hosts the static site; online rooms use the browser's PeerJS/WebRTC
 transport. `npm run dev` serves the same site locally.
+
+### Ad manager setup
+
+1. In the **movie-draft** Vercel project, connect a **public Vercel Blob store**. A public store is needed because published ad media is shown to players. The store uses Vercel OIDC by default; keep `BLOB_STORE_ID` and `BLOB_WEBHOOK_PUBLIC_KEY` connected to Production and Preview.
+2. In Project Settings → Environment Variables, create a secret called `AD_ADMIN_PASSWORD` with a strong value of at least 16 characters for **Production and Preview**. Choose and enter this yourself; do not commit it to Git. Redeploy after changing environment variables.
+3. Open `/admin.html` on the deployed site and sign in. Upload a file, enter title, description, button text, destination URL, placement, and optional dates. Tick **Publish this ad** and save. Ads are off until published. Changes may take about a minute to appear on new game visits.
+
+Media is capped at 15 MB. MP4 duration is checked in the browser and again by the server before publication. More than one active ad in a placement rotates between page visits. The public game keeps working if ad storage is temporarily unavailable; it simply shows no ads. The local `npm run dev` server does not emulate Vercel Functions, so test the admin workflow on a Vercel deployment or with `vercel dev`.
 
 ---
 

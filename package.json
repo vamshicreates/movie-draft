@@ -11,6 +11,10 @@
     "test": "node scripts/test-party-room.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.8.0",
     "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
