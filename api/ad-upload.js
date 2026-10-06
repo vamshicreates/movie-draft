@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { handleUpload } from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
+import { handleUploadPresigned } from "@vercel/blob/client";
 import { isAdmin, json, MEDIA_TYPES, storageReady } from "./_ads.js";
 
 function validTicket(ticket) {
@@ -22,19 +23,28 @@ export async function POST(request) {
   if (!storageReady()) return json({ error: "Connect a public Vercel Blob store" }, 503);
   try {
     const body = await request.json();
-    const result = await handleUpload({
+    const result = await handleUploadPresigned({
       request, body,
-      onBeforeGenerateToken: async (pathname) => {
+      getSignedToken: async (pathname) => {
         if (!validTicket(new URL(request.url).searchParams.get("ticket"))) throw new Error("Upload authorization expired");
         if (!/^ads\/media\/[a-zA-Z0-9-]+\.(png|jpe?g|webp|gif|mp4)$/.test(pathname)) throw new Error("Invalid media name");
+        const validUntil = Date.now() + 5 * 60_000;
         return {
-          allowedContentTypes: MEDIA_TYPES,
-          maximumSizeInBytes: 15 * 1024 * 1024,
-          addRandomSuffix: true,
-          validUntil: Date.now() + 5 * 60_000,
+          token: await issueSignedToken({
+            pathname,
+            operations: ["put"],
+            allowedContentTypes: MEDIA_TYPES,
+            maximumSizeInBytes: 15 * 1024 * 1024,
+            validUntil,
+          }),
+          urlOptions: {
+            allowedContentTypes: MEDIA_TYPES,
+            maximumSizeInBytes: 15 * 1024 * 1024,
+            addRandomSuffix: true,
+            validUntil,
+          },
         };
       },
-      onUploadCompleted: async () => {},
     });
     return json(result);
   } catch (error) {

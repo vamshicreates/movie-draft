@@ -1,4 +1,4 @@
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 
 const $ = (id) => document.getElementById(id);
 const state = { password: "", revision: null, ads: [], editingId: null, previewUrl: null };
@@ -29,10 +29,17 @@ async function api(path, options = {}) {
   return result;
 }
 
-function localDate(iso) {
+function localDate(iso, endOfDay = false) {
   if (!iso) return "";
-  const date = new Date(iso);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+  const date = new Date(Date.parse(iso) - Number(endOfDay));
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
+
+function scheduleDate(value, endOfDay = false) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day + Number(endOfDay));
+  return date.toISOString();
 }
 
 function releasePreviewUrl() {
@@ -91,10 +98,10 @@ function editAd(ad = null) {
   $("ad-placement").value = ad?.placement || "home";
   $("ad-title").value = ad?.title || "";
   $("ad-copy").value = ad?.copy || "";
-  $("ad-cta").value = ad?.cta || "Explore";
+  $("ad-cta").value = ad?.cta || "";
   $("ad-href").value = ad?.href || "";
   $("ad-start").value = localDate(ad?.startsAt);
-  $("ad-end").value = localDate(ad?.endsAt);
+  $("ad-end").value = localDate(ad?.endsAt, true);
   $("ad-enabled").checked = Boolean(ad?.enabled);
   $("ad-file").value = "";
   updatePreview();
@@ -178,7 +185,7 @@ async function mediaForSave() {
   }
   status("Uploading media…");
   const { uploadUrl } = await api("/api/ad-upload");
-  const blob = await upload(`ads/media/${crypto.randomUUID()}.${typeExtensions[file.type]}`, file, {
+  const blob = await uploadPresigned(`ads/media/${crypto.randomUUID()}.${typeExtensions[file.type]}`, file, {
     access: "public", handleUploadUrl: uploadUrl, contentType: file.type,
     multipart: file.size > 4 * 1024 * 1024,
   });
@@ -207,6 +214,11 @@ $("ad-form").addEventListener("submit", async (event) => {
   const button = $("save-ad");
   button.disabled = true;
   try {
+    const startsAt = scheduleDate($("ad-start").value);
+    const endsAt = scheduleDate($("ad-end").value, true);
+    if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) {
+      throw new Error("End date must be on or after start date");
+    }
     const media = await mediaForSave();
     const ad = {
       id: state.editingId || crypto.randomUUID(),
@@ -216,8 +228,8 @@ $("ad-form").addEventListener("submit", async (event) => {
       cta: $("ad-cta").value.trim(),
       href: $("ad-href").value.trim(),
       ...media,
-      startsAt: $("ad-start").value ? new Date($("ad-start").value).toISOString() : "",
-      endsAt: $("ad-end").value ? new Date($("ad-end").value).toISOString() : "",
+      startsAt,
+      endsAt,
       enabled: $("ad-enabled").checked,
     };
     const ads = state.editingId ? state.ads.map((item) => item.id === state.editingId ? ad : item) : [...state.ads, ad];

@@ -31,12 +31,12 @@
           <label>Placement<select id="ad-placement" required><option value="home">A · Home ribbon</option><option value="live">B · During the draft</option><option value="waiting">C · Waiting room</option><option value="results">D · Results / side rail</option></select></label>
           <label>Film or campaign title<input id="ad-title" maxlength="80" required placeholder="Now streaming" /></label>
           <label class="admin-wide">Short description<input id="ad-copy" maxlength="140" placeholder="One line about the release" /></label>
-          <label>Button text<input id="ad-cta" maxlength="28" required value="Explore" /></label>
+          <label>Button text<input id="ad-cta" maxlength="28" required placeholder="Explore" /></label>
           <label>Destination website<input id="ad-href" type="url" required placeholder="https://example.com/film" /></label>
           <label class="admin-wide">Image, GIF or MP4 (up to 15 MB; video 10 seconds max)<input id="ad-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,.mp4" /></label>
           <div id="media-preview" class="admin-wide admin-preview"></div>
-          <label>Start date (optional)<input id="ad-start" type="datetime-local" /></label>
-          <label>End date (optional)<input id="ad-end" type="datetime-local" /></label>
+          <label>Start date (optional)<input id="ad-start" type="date" /></label>
+          <label>End date (optional, includes this day)<input id="ad-end" type="date" /></label>
           <label class="admin-switch admin-wide"><input id="ad-enabled" type="checkbox" /> Publish this ad</label>
           <div class="admin-actions admin-wide"><button id="save-ad" class="nf-btn-red" type="submit">Save ad</button><button id="cancel-ad" class="nf-btn-ghost" type="button">Clear form</button></div>
         </form>
