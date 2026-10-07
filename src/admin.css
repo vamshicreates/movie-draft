@@ -13,6 +13,15 @@
 .admin-login form { display: grid; gap: 1rem; margin-top: 1rem; }
 .admin-panel-top { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-bottom: 1rem; }
 .admin-panel-top button { flex: none; }
+.admin-toolbar { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.admin-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; margin: .9rem 0 1rem; }
+.admin-overview > div { display: grid; gap: .2rem; border: 1px solid #454545; border-radius: 10px; background: #222; padding: .75rem; }
+.admin-overview span { color: var(--nf-silver); font-size: .69rem; font-weight: 700; }
+.admin-overview strong { color: #fff; font: 800 1.35rem var(--font-sans); }
+.admin-filters { display: flex; gap: .45rem; margin-bottom: .8rem; }
+.admin-filters button { min-height: 36px; border: 1px solid #555; border-radius: 999px; background: #202020; color: #fff; padding: .35rem .8rem; cursor: pointer; }
+.admin-filters button[aria-pressed="true"] { border-color: var(--nf-red); background: #4b1015; }
+.admin-filters button:focus-visible { outline: 2px solid #fff; }
 .admin-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; margin-top: 1rem; }
 .admin-form label, .admin-login label { display: grid; gap: .4rem; color: #fff; font-size: .78rem; font-weight: 800; }
 .admin-form input:not([type="checkbox"]), .admin-form select, .admin-login input { width: 100%; min-height: 43px; border: 1px solid #5b5b5b; border-radius: 8px; background: #0d0d0d; color: #fff; padding: .55rem .65rem; font: 600 .84rem var(--font-sans); }
@@ -26,6 +35,21 @@
 .admin-preview { min-height: 65px; color: var(--nf-muted); }
 .admin-preview .sponsor-card { max-width: 720px; }
 .admin-list { display: grid; gap: .6rem; }
+.admin-campaign { display: grid; gap: .8rem; border: 1px solid #454545; border-radius: 12px; padding: .75rem; background: #222; }
+.admin-campaign-preview { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+.admin-campaign-preview img, .admin-campaign-preview video { width: 92px; height: 72px; object-fit: cover; border-radius: 7px; background: #0b0b0b; flex: none; }
+.admin-campaign-info { display: grid; min-width: 0; gap: .15rem; }
+.admin-campaign-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-campaign-info small { color: #f5b1b5; font-size: .72rem; }
+.admin-campaign-info > span { color: var(--nf-silver); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-campaign-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .4rem; }
+.admin-campaign-metrics > div { display: grid; gap: .15rem; border-radius: 8px; background: #151515; padding: .5rem .6rem; }
+.admin-campaign-metrics strong { color: #fff; font-size: 1rem; }
+.admin-campaign-metrics span { color: var(--nf-muted); font-size: .65rem; }
+.admin-campaign-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-campaign-actions button { min-height: 38px; border: 1px solid #5a5a5a; border-radius: 7px; background: #141414; color: #fff; padding: .35rem .65rem; cursor: pointer; }
+.admin-campaign-actions button:hover { border-color: #fff; }
+.admin-campaign-actions button:focus-visible { outline: 2px solid var(--nf-red); }
 .admin-list-row { display: flex; align-items: center; gap: .7rem; border: 1px solid #414141; border-radius: 10px; padding: .65rem; background: #222; }
 .admin-list-row .admin-list-info { min-width: 0; flex: 1; display: grid; gap: .12rem; }
 .admin-list-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -41,6 +65,11 @@
   .admin-form { grid-template-columns: 1fr; }
   .admin-form > * { grid-column: 1; }
   .admin-panel-top { align-items: flex-start; }
+  .admin-panel-top { flex-direction: column; }
+  .admin-toolbar { justify-content: flex-start; }
+  .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-overview > div:first-child { grid-column: 1 / -1; }
+  .admin-campaign-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-list-row { flex-wrap: wrap; }
   .admin-list-info { flex-basis: 100% !important; }
 }

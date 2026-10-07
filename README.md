@@ -71,6 +71,8 @@ transport. `npm run dev` serves the same site locally.
 
 Media is capped at 15 MB. MP4 duration is checked in the browser and again by the server before publication. More than one active ad in a placement rotates between page visits. The public game keeps working if ad storage is temporarily unavailable; it simply shows no ads. The local `npm run dev` server does not emulate Vercel Functions, so test the admin workflow on a Vercel deployment or with `vercel dev`.
 
+The **Published ads dashboard** at `/admin.html` shows live, scheduled, paused, and ended campaigns. Sign in with `AD_ADMIN_PASSWORD` to edit or pause ads and refresh outbound click counts. The image, button link, and ad text use separate signed redirect URLs; a click is recorded before opening the advertiser destination. Counts are raw outbound clicks, not unique people or impressions, and begin with this feature's deployment. Video playback controls do not count as outbound clicks. Click events are stored in Vercel Blob without visitor identities; monitor Blob Advanced Operations usage as traffic grows, since each click writes one event.
+
 ---
 
 ## 📜 License

@@ -1,9 +1,69 @@
-import { timingSafeEqual, createHash } from "node:crypto";
+import { timingSafeEqual, createHash, createHmac } from "node:crypto";
 import { list, put, head } from "@vercel/blob";
 
 export const PLACEMENTS = ["home", "live", "waiting", "results"];
 export const MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"];
+export const CLICK_PARTS = ["image", "link", "text"];
 const CONFIG_PREFIX = "ads/config/";
+const CLICK_PREFIX = "ads/clicks/";
+const CLICK_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
+function clickSignature(id, part, href, expires) {
+  return createHmac("sha256", process.env.AD_ADMIN_PASSWORD)
+    .update(`ad-click:v1\n${id}\n${part}\n${href}\n${expires}`).digest("hex");
+}
+
+export function clickUrl(ad, part, now = Date.now()) {
+  if (!process.env.AD_ADMIN_PASSWORD || process.env.AD_ADMIN_PASSWORD.length < 16) return ad.href;
+  const expires = String(now + CLICK_LIFETIME_MS);
+  const query = new URLSearchParams({ id: ad.id, part, to: ad.href, expires });
+  query.set("signature", clickSignature(ad.id, part, ad.href, expires));
+  return `/api/ad-click?${query}`;
+}
+
+export function verifiedClick(url, now = Date.now()) {
+  if (!process.env.AD_ADMIN_PASSWORD || process.env.AD_ADMIN_PASSWORD.length < 16) return null;
+  const query = new URL(url).searchParams;
+  const id = query.get("id") || "";
+  const part = query.get("part") || "";
+  const href = query.get("to") || "";
+  const expires = query.get("expires") || "";
+  const signature = query.get("signature") || "";
+  if (!/^[a-zA-Z0-9-]{8,50}$/.test(id) || !CLICK_PARTS.includes(part) ||
+      !/^\d{13}$/.test(expires) || Number(expires) < now ||
+      Number(expires) > now + CLICK_LIFETIME_MS || !/^[a-f0-9]{64}$/.test(signature)) return null;
+  try {
+    const destination = new URL(href);
+    if (destination.protocol !== "https:") return null;
+  } catch { return null; }
+  const expected = clickSignature(id, part, href, expires);
+  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  return { id, part, href };
+}
+
+export function countClickPaths(pathnames) {
+  const byAd = {};
+  for (const pathname of pathnames) {
+    const match = pathname.match(/^ads\/clicks\/([a-zA-Z0-9-]{8,50})\/(image|link|text)\/\d{13}-[a-f0-9-]{36}\.txt$/);
+    if (!match) continue;
+    const [, id, part] = match;
+    byAd[id] ||= { total: 0, image: 0, link: 0, text: 0 };
+    byAd[id][part] += 1;
+    byAd[id].total += 1;
+  }
+  return byAd;
+}
+
+export async function readClickCounts() {
+  const pathnames = [];
+  let cursor;
+  do {
+    const page = await list({ prefix: CLICK_PREFIX, limit: 1000, cursor });
+    pathnames.push(...page.blobs.map((blob) => blob.pathname));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return countClickPaths(pathnames);
+}
 
 export function json(data, status = 200, headers = {}) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store", ...headers } });

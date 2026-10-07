@@ -1603,10 +1603,13 @@ kbd {
   color: #fff;
 }
 .sponsor-media { width: 72px; height: 72px; display: block; overflow: hidden; border-radius: 8px; background: #090909; }
+.sponsor-media[href]:hover, .sponsor-media[href]:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .sponsor-card-video { grid-template-columns: 160px minmax(0, 1fr) auto; }
 .sponsor-card-video .sponsor-media { width: 160px; height: 90px; }
 .sponsor-media img, .sponsor-media video { display: block; width: 100%; height: 100%; object-fit: cover; }
-.sponsor-copy { display: flex; flex-direction: column; min-width: 0; gap: .07rem; }
+.sponsor-copy { display: flex; flex-direction: column; min-width: 0; gap: .07rem; color: #fff; text-decoration: none; }
+.sponsor-copy:hover strong, .sponsor-copy:focus-visible strong { text-decoration: underline; }
+.sponsor-copy:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .sponsor-label { color: #f5b1b5; text-transform: uppercase; letter-spacing: .12em; font: 800 .61rem var(--font-mono); }
 .sponsor-copy strong { font-size: .9rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sponsor-copy > span:last-child { color: var(--nf-silver); font-size: .72rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

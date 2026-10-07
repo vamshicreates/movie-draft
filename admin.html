@@ -22,7 +22,15 @@
     </section>
     <div id="admin-dashboard" class="admin-dashboard hidden">
       <section class="admin-panel">
-        <div class="admin-panel-top"><div><h3>Campaigns</h3><p>Only one ad appears in each placement at a time. If several are active, they rotate between page visits.</p></div><button id="new-ad" class="nf-btn-ghost" type="button">+ New ad</button></div>
+        <div class="admin-panel-top"><div><h3>Published ads dashboard</h3><p>See your ads and their outbound clicks. Counts start when this dashboard goes live.</p></div><div class="admin-toolbar"><button id="refresh-stats" class="nf-btn-ghost" type="button">Refresh clicks</button><button id="new-ad" class="nf-btn-ghost" type="button">+ New ad</button></div></div>
+        <div class="admin-overview" aria-label="Ad click overview">
+          <div><span>Published ads</span><strong id="metric-published">0</strong></div>
+          <div><span>Total clicks</span><strong id="metric-total">—</strong></div>
+          <div><span>Image clicks</span><strong id="metric-image">—</strong></div>
+          <div><span>Button link clicks</span><strong id="metric-link">—</strong></div>
+          <div><span>Text clicks</span><strong id="metric-text">—</strong></div>
+        </div>
+        <div class="admin-filters" role="group" aria-label="Filter ads"><button type="button" data-ad-filter="published" aria-pressed="true">Published</button><button type="button" data-ad-filter="all" aria-pressed="false">All ads</button><button type="button" data-ad-filter="paused" aria-pressed="false">Paused</button></div>
         <div id="ad-list" class="admin-list"></div>
       </section>
       <section class="admin-panel">

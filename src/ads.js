@@ -8,6 +8,16 @@ function safeUrl(value) {
   } catch { return ""; }
 }
 
+function outboundLink(ad, part, className, label) {
+  const link = document.createElement("a");
+  link.className = className;
+  link.href = safeUrl(ad.clickUrls?.[part] || ad.href);
+  link.target = "_blank";
+  link.rel = "noopener noreferrer sponsored";
+  link.setAttribute("aria-label", label);
+  return link;
+}
+
 function createCard(ad) {
   const card = document.createElement("article");
   card.className = "sponsor-card";
@@ -15,7 +25,9 @@ function createCard(ad) {
   card.dataset.adId = ad.id;
   card.dataset.placement = ad.placement;
 
-  const media = document.createElement("span");
+  const media = ad.mediaType === "video/mp4"
+    ? document.createElement("span")
+    : outboundLink(ad, "image", "sponsor-media", `Open ${ad.title} advertisement image`);
   media.className = "sponsor-media";
   if (ad.mediaType === "video/mp4") {
     const video = document.createElement("video");
@@ -33,8 +45,7 @@ function createCard(ad) {
     image.loading = "lazy";
     media.append(image);
   }
-  const words = document.createElement("span");
-  words.className = "sponsor-copy";
+  const words = outboundLink(ad, "text", "sponsor-copy", `Open ${ad.title} advertisement`);
   const label = document.createElement("span");
   label.className = "sponsor-label";
   label.textContent = "Sponsored";
@@ -43,13 +54,8 @@ function createCard(ad) {
   const description = document.createElement("span");
   description.textContent = ad.copy;
   words.append(label, title, description);
-  const cta = document.createElement("a");
-  cta.className = "sponsor-cta";
+  const cta = outboundLink(ad, "link", "sponsor-cta", `${ad.cta}: ${ad.title} (sponsored)`);
   cta.textContent = ad.cta;
-  cta.href = safeUrl(ad.href);
-  cta.target = "_blank";
-  cta.rel = "noopener noreferrer sponsored";
-  cta.setAttribute("aria-label", `${ad.cta}: ${ad.title} (sponsored)`);
   card.append(media, words, cta);
   return card;
 }

@@ -1,7 +1,7 @@
 import { uploadPresigned } from "@vercel/blob/client";
 
 const $ = (id) => document.getElementById(id);
-const state = { password: "", revision: null, ads: [], editingId: null, previewUrl: null };
+const state = { password: "", revision: null, ads: [], stats: null, filter: "published", editingId: null, previewUrl: null };
 const typeExtensions = {
   "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp",
   "image/gif": "gif", "video/mp4": "mp4",
@@ -109,25 +109,70 @@ function editAd(ad = null) {
 }
 
 function renderList() {
+  const total = { total: 0, image: 0, link: 0, text: 0 };
+  for (const ad of state.ads) {
+    const counts = state.stats?.[ad.id];
+    if (counts) for (const key of Object.keys(total)) total[key] += counts[key] || 0;
+  }
+  $("metric-published").textContent = String(state.ads.filter((ad) => ad.enabled).length);
+  for (const key of Object.keys(total)) $(`metric-${key}`).textContent = state.stats ? total[key].toLocaleString() : "—";
+  document.querySelectorAll("[data-ad-filter]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.adFilter === state.filter));
+  });
+
   const list = $("ad-list");
   list.replaceChildren();
-  if (!state.ads.length) {
+  const shown = state.ads.filter((ad) => state.filter === "all" || (state.filter === "published" ? ad.enabled : !ad.enabled));
+  if (!shown.length) {
     const empty = document.createElement("p");
     empty.className = "admin-empty";
-    empty.textContent = "No ads yet. Create one below when you have campaign media and a destination link.";
+    empty.textContent = state.ads.length
+      ? `No ${state.filter === "published" ? "published" : "paused"} ads. Choose All ads to see every campaign.`
+      : "No ads yet. Create one below when you have campaign media and a destination link.";
     list.append(empty);
     return;
   }
-  for (const ad of state.ads) {
-    const row = document.createElement("div");
-    row.className = "admin-list-row";
+  for (const ad of shown) {
+    const row = document.createElement("article");
+    row.className = "admin-campaign";
+    const preview = document.createElement("div");
+    preview.className = "admin-campaign-preview";
+    const media = document.createElement(ad.mediaType === "video/mp4" ? "video" : "img");
+    media.src = ad.mediaUrl;
+    if (ad.mediaType === "video/mp4") {
+      media.controls = true;
+      media.muted = true;
+      media.playsInline = true;
+      media.preload = "metadata";
+    } else media.alt = `Creative for ${ad.title}`;
     const info = document.createElement("div");
-    info.className = "admin-list-info";
+    info.className = "admin-campaign-info";
     const title = document.createElement("strong");
     title.textContent = ad.title;
     const detail = document.createElement("small");
-    detail.textContent = `${placementNames[ad.placement]} · ${ad.enabled ? "Published" : "Paused"}${ad.startsAt ? " · Scheduled" : ""}`;
-    info.append(title, detail);
+    const now = Date.now();
+    const phase = !ad.enabled ? "Paused" : ad.startsAt && Date.parse(ad.startsAt) > now ? "Scheduled" : ad.endsAt && Date.parse(ad.endsAt) <= now ? "Ended" : "Live";
+    detail.textContent = `${placementNames[ad.placement]} · ${phase}`;
+    const copy = document.createElement("span");
+    copy.textContent = ad.copy;
+    info.append(title, detail, copy);
+    preview.append(media, info);
+
+    const metrics = document.createElement("div");
+    metrics.className = "admin-campaign-metrics";
+    const counts = state.stats?.[ad.id];
+    for (const [key, label] of [["total", "Total clicks"], ["image", "Image"], ["link", "Button link"], ["text", "Text"]]) {
+      const metric = document.createElement("div");
+      const number = document.createElement("strong");
+      number.textContent = state.stats ? (counts?.[key] || 0).toLocaleString() : "—";
+      const name = document.createElement("span");
+      name.textContent = label;
+      metric.append(number, name);
+      metrics.append(metric);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "admin-campaign-actions";
     const action = (label, onClick) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -135,13 +180,25 @@ function renderList() {
       button.addEventListener("click", onClick);
       return button;
     };
-    row.append(info, action("Edit", () => editAd(ad)),
+    actions.append(action("Edit", () => editAd(ad)),
       action(ad.enabled ? "Pause" : "Publish", () => changeAds(state.ads.map((item) => item.id === ad.id ? { ...item, enabled: !item.enabled } : item))),
       action("Delete", () => {
         if (confirm(`Delete “${ad.title}” from ad placements?`)) changeAds(state.ads.filter((item) => item.id !== ad.id));
       }));
+    row.append(preview, metrics, actions);
     list.append(row);
   }
+}
+
+async function refreshStats() {
+  $("refresh-stats").disabled = true;
+  try {
+    const result = await api("/api/admin-ad-stats");
+    state.stats = result.byAd || {};
+    renderList();
+    status("Click counts updated.", true);
+  } catch (error) { status(error.message); }
+  finally { $("refresh-stats").disabled = false; }
 }
 
 async function changeAds(ads) {
@@ -206,6 +263,7 @@ $("login-form").addEventListener("submit", async (event) => {
     renderList();
     editAd();
     status("Ad manager ready.", true);
+    refreshStats();
   } catch (error) { status(error.message); }
 });
 
@@ -233,12 +291,18 @@ $("ad-form").addEventListener("submit", async (event) => {
       enabled: $("ad-enabled").checked,
     };
     const ads = state.editingId ? state.ads.map((item) => item.id === state.editingId ? ad : item) : [...state.ads, ad];
+    if (!ad.enabled && state.filter === "published") state.filter = "all";
     await changeAds(ads);
   } catch (error) { status(error.message); }
   finally { button.disabled = false; }
 });
 
 $("new-ad").addEventListener("click", () => editAd());
+$("refresh-stats").addEventListener("click", refreshStats);
+document.querySelectorAll("[data-ad-filter]").forEach((button) => button.addEventListener("click", () => {
+  state.filter = button.dataset.adFilter;
+  renderList();
+}));
 $("cancel-ad").addEventListener("click", () => editAd());
 for (const id of ["ad-file", "ad-title", "ad-copy", "ad-cta"]) $(id).addEventListener("input", updatePreview);
 editAd();
