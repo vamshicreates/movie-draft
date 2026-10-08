@@ -11,6 +11,7 @@ mkdirSync(output);
 
 cpSync(path.join(root, "index.html"), path.join(output, "index.html"));
 cpSync(path.join(root, "admin.html"), path.join(output, "admin.html"));
+cpSync(path.join(root, "legal.html"), path.join(output, "legal.html"));
 cpSync(path.join(root, "src"), path.join(output, "src"), { recursive: true });
 
 for (const asset of readdirSync(path.join(root, "public"))) {

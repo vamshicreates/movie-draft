@@ -240,6 +240,38 @@ body {
   text-align: center;
 }
 
+.site-legal-intro {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .35rem .65rem;
+  margin-bottom: .65rem;
+  color: var(--nf-silver);
+  font-size: .72rem;
+}
+
+.site-legal-intro strong { color: var(--nf-white); }
+
+.site-legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .35rem .85rem;
+  max-width: 1050px;
+  margin: 0 auto 1.1rem;
+}
+
+.site-legal-links a {
+  color: var(--nf-silver);
+  font-size: .72rem;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, .35);
+  text-underline-offset: 3px;
+}
+
+.site-legal-links a:hover { color: var(--nf-white); }
+.site-legal-links a:focus-visible { outline: 2px solid var(--nf-red); outline-offset: 4px; }
+
 .creator-button {
   display: inline-flex;
   align-items: center;
